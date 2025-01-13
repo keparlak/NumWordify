@@ -71,31 +71,27 @@ You can create your own localization model for any currency. Here's an example f
 using NumWordify.Extensions;
 using NumWordify.Models;
 // Create custom localization model
-var japaneseLocalization = new LocalizationModel
-{
-Currency = new CurrencyModel
-{
-Major = "YEN",
-Minor = "SEN"
-},
-Numbers = new NumbersModel
-{
-Ones = new[] { "", "ICHI", "NI", "SAN", "YON", "GO", "ROKU", "NANA", "HACHI", "KYU" },
-Tens = new[] { "", "JU", "NIJU", "SANJU", "YONJU", "GOJU", "ROKUJU", "NANAJU", "HACHIJU", "KYUJU" },
-Hundreds = new[] { "", "HYAKU", "NIHYAKU", "SANBYAKU", "YONHYAKU", "GOHYAKU", "ROPPYAKU", "NANAHYAKU", "HAPPYAKU", "KYUHYAKU" },
-Scales = new[] { "", "SEN", "MAN", "OKU", "CHO", "KEI" }
-},
-Settings = new SettingsModel
-{
-SkipOneForThousand = true,
-SkipOneForHundred = true,
-NegativeWord = "MAINASU",
-ZeroWord = "ZERO",
-CurrencyFormat = "{whole} {major}",
-NumberFormat = "{whole} TEN {decimal}"
-}
+var japaneseLocalization = new LocalizationModel {
+  Currency = new CurrencyModel {
+      Major = "YEN",
+        Minor = "SEN"
+    },
+    Numbers = new NumbersModel {
+      Ones = new ["", "ICHI", "NI", "SAN", "YON", "GO", "ROKU", "NANA", "HACHI", "KYU"],
+        Tens = new ["", "JU", "NIJU", "SANJU", "YONJU", "GOJU", "ROKUJU", "NANAJU", "HACHIJU", "KYUJU"],
+        Hundreds = new ["", "HYAKU", "NIHYAKU", "SANBYAKU", "YONHYAKU", "GOHYAKU", "ROPPYAKU", "NANAHYAKU", "HAPPYAKU", "KYUHYAKU"],
+        Scales = new ["", "SEN", "MAN", "OKU", "CHO", "KEI"]
+    },
+    Settings = new SettingsModel {
+      SkipOneForThousand = true,
+        SkipOneForHundred = true,
+        NegativeWord = "MAINASU",
+        ZeroWord = "ZERO",
+        CurrencyFormat = "{whole} {major}",
+        NumberFormat = "{whole} TEN {decimal}"
+    }
 };
-decimal amount = 1234.56M;
+decimal amount = 1234.56 M;
 string result = amount.ToWords(japaneseLocalization);
 // Output: "SEN NIHYAKU SANJU YON YEN"
 ```
@@ -107,6 +103,9 @@ string result = amount.ToWords(japaneseLocalization);
 | en-US        | English  | US Dollar (USD)    |
 | tr-TR        | Turkish  | Turkish Lira (TRY) |
 | tr-TR-EUR    | Turkish  | Euro (EUR)         |
+| fr-FR        | French   | Euro (EUR)         |
+| es-ES        | Spanish  | Euro (EUR)         |
+
 
 ## Adding New Languages
 
@@ -187,5 +186,3 @@ Kadir Emre Parlak
 ## Support
 
 If you encounter any issues or have questions, please create an issue on GitHub.
-
-Not: Kod bloklarını üç ters tırnak (```) ve dil belirteci (bash, csharp, json) ile çevrelemeyi unutmayın. Markdown formatında bu önemlidir.
