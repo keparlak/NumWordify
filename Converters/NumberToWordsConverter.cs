@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Reflection;
 using System.Text;
+using System.Globalization;
 using NumWordify.Models;
 
 namespace NumWordify.Converters;
@@ -75,6 +76,16 @@ public class NumberToWordsConverter
     {
         _localization = localization;
         ValidateLocalization();
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class using the specified CultureInfo.
+    /// </summary>
+    /// <param name="cultureInfo">The CultureInfo to use for localization.</param>
+    /// <exception cref="FileNotFoundException">Thrown when the localization file for the specified culture is not found.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when deserialization of localization data fails.</exception>
+    public NumberToWordsConverter(CultureInfo cultureInfo) : this(cultureInfo.Name)
+    {
     }
 
     private void ValidateLocalization()
