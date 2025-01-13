@@ -1,0 +1,53 @@
+{
+  "currency": {
+    "major": "TL",
+    "minor": "Kr"
+  },
+  "settings": {
+    "skipOneForThousand": true,
+    "skipOneForHundred": true,
+    "negativeWord": "EKSİ",
+    "zeroWord": "SIFIR",
+    "currencyFormat": "{whole} {major} {decimal} {minor}",
+    "numberFormat": "{whole} NOKTA {decimal}"
+  },
+  "numbers": {
+    "ones": [
+      "",
+      "BİR",
+      "İKİ",
+      "ÜÇ",
+      "DÖRT",
+      "BEŞ",
+      "ALTI",
+      "YEDİ",
+      "SEKİZ",
+      "DOKUZ"
+    ],
+    "tens": [
+      "",
+      "ON",
+      "YİRMİ",
+      "OTUZ",
+      "KIRK",
+      "ELLİ",
+      "ALTMIŞ",
+      "YETMİŞ",
+      "SEKSEN",
+      "DOKSAN"
+    ],
+    "hundreds": [
+      "",
+      "YÜZ",
+      "İKİ YÜZ",
+      "ÜÇ YÜZ",
+      "DÖRT YÜZ",
+      "BEŞ YÜZ",
+      "ALTI YÜZ",
+      "YEDİ YÜZ",
+      "SEKİZ YÜZ",
+      "DOKUZ YÜZ"
+    ],
+    "scales": ["", "BİN", "MİLYON", "MİLYAR", "TRİLYON", "KATRİLYON"]
+  }
+}

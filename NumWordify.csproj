@@ -1,9 +1,31 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFrameworks>net9.0;net8.0;net7.0;net6.0;netstandard2.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>NumWordify</PackageId>
+    <Version>1.0.10</Version>
+    <PackageVersion>1.0.10</PackageVersion>
+    <Authors>Kadir Emre Parlak</Authors>
+    <Company>
+    </Company>
+    <Description>A library for converting numbers to words in multiple languages with currency support</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageProjectUrl>https://github.com/keparlak/NumWordify</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/keparlak/NumWordify</RepositoryUrl>
+    <PackageTags>number;converter;localization;currency;words</PackageTags>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <LangVersion>latest</LangVersion>
   </PropertyGroup>
-
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="/" />
+    <EmbeddedResource Include="Resources\*.json">
+      <LogicalName>NumWordify.Resources.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
 </Project>

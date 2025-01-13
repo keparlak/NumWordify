@@ -1,0 +1,53 @@
+{
+  "currency": {
+    "major": "EUR",
+    "minor": "Centimes"
+  },
+  "settings": {
+    "skipOneForThousand": false,
+    "skipOneForHundred": false,
+    "negativeWord": "NÉGATIF",
+    "zeroWord": "ZÉRO",
+    "currencyFormat": "{whole} {major} {decimal} {minor}",
+    "numberFormat": "{whole} VIRGULE {decimal}"
+  },
+  "numbers": {
+    "ones": [
+      "",
+      "UN",
+      "DEUX",
+      "TROIS",
+      "QUATRE",
+      "CINQ",
+      "SIX",
+      "SEPT",
+      "HUIT",
+      "NEUF"
+    ],
+    "tens": [
+      "",
+      "DIX",
+      "VINGT",
+      "TRENTE",
+      "QUARANTE",
+      "CINQUANTE",
+      "SOIXANTE",
+      "SOIXANTE-DIX",
+      "QUATRE-VINGT",
+      "QUATRE-VINGT-DIX"
+    ],
+    "hundreds": [
+      "",
+      "CENT",
+      "DEUX CENTS",
+      "TROIS CENTS",
+      "QUATRE CENTS",
+      "CINQ CENTS",
+      "SIX CENTS",
+      "SEPT CENTS",
+      "HUIT CENTS",
+      "NEUF CENTS"
+    ],
+    "scales": ["", "MILLE", "MILLION", "MILLIARD", "BILLION", "BILLIARD"]
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "currency": {
+    "major": "EUR",
+    "minor": "Céntimos"
+  },
+  "settings": {
+    "skipOneForThousand": false,
+    "skipOneForHundred": false,
+    "negativeWord": "NEGATIVO",
+    "zeroWord": "CERO",
+    "currencyFormat": "{whole} {major} {decimal} {minor}",
+    "numberFormat": "{whole} COMA {decimal}"
+  },
+  "numbers": {
+    "ones": [
+      "",
+      "UNO",
+      "DOS",
+      "TRES",
+      "CUATRO",
+      "CINCO",
+      "SEIS",
+      "SIETE",
+      "OCHO",
+      "NUEVE"
+    ],
+    "tens": [
+      "",
+      "DIEZ",
+      "VEINTE",
+      "TREINTA",
+      "CUARENTA",
+      "CINCUENTA",
+      "SESENTA",
+      "SETENTA",
+      "OCHENTA",
+      "NOVENTA"
+    ],
+    "hundreds": [
+      "",
+      "CIENTO",
+      "DOSCIENTOS",
+      "TRESCIENTOS",
+      "CUATROCIENTOS",
+      "QUINIENTOS",
+      "SEISCIENTOS",
+      "SETECIENTOS",
+      "OCHOCIENTOS",
+      "NOVECIENTOS"
+    ],
+    "scales": ["", "MIL", "MILLÓN", "MILLARDO", "BILLÓN", "BILLARDO"]
+  }
+}

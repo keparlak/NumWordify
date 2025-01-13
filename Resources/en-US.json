@@ -1,0 +1,53 @@
+{
+  "currency": {
+    "major": "USD",
+    "minor": "Cents"
+  },
+  "numbers": {
+    "ones": [
+      "",
+      "ONE",
+      "TWO",
+      "THREE",
+      "FOUR",
+      "FIVE",
+      "SIX",
+      "SEVEN",
+      "EIGHT",
+      "NINE"
+    ],
+    "tens": [
+      "",
+      "TEN",
+      "TWENTY",
+      "THIRTY",
+      "FORTY",
+      "FIFTY",
+      "SIXTY",
+      "SEVENTY",
+      "EIGHTY",
+      "NINETY"
+    ],
+    "hundreds": [
+      "",
+      "ONE HUNDRED",
+      "TWO HUNDRED",
+      "THREE HUNDRED",
+      "FOUR HUNDRED",
+      "FIVE HUNDRED",
+      "SIX HUNDRED",
+      "SEVEN HUNDRED",
+      "EIGHT HUNDRED",
+      "NINE HUNDRED"
+    ],
+    "scales": ["", "THOUSAND", "MILLION", "BILLION", "TRILLION", "QUADRILLION"]
+  },
+  "settings": {
+    "skipOneForThousand": false,
+    "skipOneForHundred": false,
+    "negativeWord": "NEGATIVE",
+    "zeroWord": "ZERO",
+    "currencyFormat": "{whole} {major} {decimal} {minor}",
+    "numberFormat": "{whole} POINT {decimal}"
+  }
+}
