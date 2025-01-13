@@ -4,8 +4,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>NumWordify</PackageId>
-    <Version>1.0.10</Version>
-    <PackageVersion>1.0.10</PackageVersion>
+    <Version>1.0.15</Version>
+    <PackageVersion>1.0.15</PackageVersion>
     <Authors>Kadir Emre Parlak</Authors>
     <Company>
     </Company>
@@ -18,12 +18,18 @@
     <PackageTags>number;converter;localization;currency;words</PackageTags>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
+    <ApplicationIcon>favicon.ico</ApplicationIcon>
+    <PackageIcon>numwordify-icon.png</PackageIcon>
   </PropertyGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="numwordify-icon.png" Pack="true" PackagePath="/" />
     <EmbeddedResource Include="Resources\*.json">
-      <LogicalName>NumWordify.Resources.%(Filename)%(Extension)</LogicalName>
+      <LogicalName>%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="favicon.ico" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
