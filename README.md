@@ -134,7 +134,6 @@ string result = amount.ToWords(japaneseLocalization);
 | ------------ | -------- | ------------------ | ------------------------------- |
 | en-US        | English  | US Dollar (USD)    | Teens (11-19), Compound numbers |
 | tr-TR        | Turkish  | Turkish Lira (TRY) | Skip "bir" for hundreds         |
-| tr-TR-EUR    | Turkish  | Euro (EUR)         | Skip "bir" for hundreds         |
 | fr-FR        | French   | Euro (EUR)         | -                               |
 | es-ES        | Spanish  | Euro (EUR)         | -                               |
 
