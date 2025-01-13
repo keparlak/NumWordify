@@ -12,6 +12,7 @@ namespace NumWordify.Converters;
 public class NumberToWordsConverter
 {
     private readonly LocalizationModel _localization;
+    private CurrencyModel? _overriddenCurrency;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class using the specified culture.
@@ -88,6 +89,31 @@ public class NumberToWordsConverter
     {
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class using the specified culture and currency.
+    /// </summary>
+    /// <param name="culture">The culture code to use for localization (e.g., "tr-TR").</param>
+    /// <param name="currency">The currency model to override the default currency.</param>
+    public NumberToWordsConverter(string culture, CurrencyModel currency) : this(culture)
+    {
+        _overriddenCurrency = currency;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class using the specified CultureInfo and currency.
+    /// </summary>
+    /// <param name="cultureInfo">The CultureInfo to use for localization.</param>
+    /// <param name="currency">The currency model to override the default currency.</param>
+    public NumberToWordsConverter(CultureInfo cultureInfo, CurrencyModel currency) : this(cultureInfo)
+    {
+        _overriddenCurrency = currency;
+    }
+
+    /// <summary>
+    /// Gets the current currency model being used for conversion.
+    /// </summary>
+    private CurrencyModel CurrentCurrency => _overriddenCurrency ?? _localization.Currency;
+
     private void ValidateLocalization()
     {
         if (_localization.Numbers.Ones.Length != 10)
@@ -136,9 +162,9 @@ public class NumberToWordsConverter
 
         var result = _localization.Settings.CurrencyFormat
             .Replace("{whole}", wholeWords)
-            .Replace("{major}", _localization.Currency.Major)
+            .Replace("{major}", CurrentCurrency.Major)
             .Replace("{decimal}", decimalWords)
-            .Replace("{minor}", _localization.Currency.Minor)
+            .Replace("{minor}", CurrentCurrency.Minor)
             .Trim();
 
         return isNegative ? $"{_localization.Settings.NegativeWord} {result}" : result;
@@ -220,18 +246,50 @@ public class NumberToWordsConverter
 
         // Onlar ve birler basamağı
         var remainder = number % 100;
+
+        // Özel sayılar için kontrol (11-19 arası)
+        if (remainder >= 11 && remainder <= 19 &&
+            _localization.Settings.UseTeens &&
+            _localization.SpecialNumbers?.Teens != null)
+        {
+            result.Add(_localization.SpecialNumbers.Teens[remainder - 11]);
+            return string.Join(" ", result);
+        }
+
+        // Özel sayılar sözlüğünde varsa direkt kullan
+        if (_localization.SpecialNumbers?.Special?.ContainsKey(remainder) == true)
+        {
+            result.Add(_localization.SpecialNumbers.Special[remainder]);
+            return string.Join(" ", result);
+        }
+
         var tens = remainder / 10;
         var ones = remainder % 10;
 
         if (tens > 0)
-            result.Add(_localization.Numbers.Tens[tens]);
+        {
+            var tensWord = _localization.Numbers.Tens[tens];
 
-        // "Bir Bin" kontrolü
-        if (ones > 0 && !(_localization.Settings.SkipOneForThousand &&
+            // Birler basamağı varsa ve compound numbers kullanılıyorsa
+            if (ones > 0 && _localization.Settings.UseCompoundNumbers)
+            {
+                var separator = _localization.SpecialNumbers?.CompoundSeparator ?? " ";
+                tensWord += separator + _localization.Numbers.Ones[ones];
+                result.Add(tensWord);
+            }
+            else
+            {
+                result.Add(tensWord);
+            }
+        }
+        // Sadece birler basamağı varsa
+        else if (ones > 0 && !(_localization.Settings.SkipOneForThousand &&
             ones == 1 && number == 1 && currentScale == 1))
+        {
             result.Add(_localization.Numbers.Ones[ones]);
+        }
 
-        return string.Join(" ", result);
+        return string.Join(" ", result).Trim();
     }
 
     private int currentScale = 0;

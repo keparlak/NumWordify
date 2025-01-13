@@ -4,8 +4,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <PackageId>NumWordify</PackageId>
-    <Version>1.0.15</Version>
-    <PackageVersion>1.0.15</PackageVersion>
+    <Version>1.0.18</Version>
+    <PackageVersion>1.0.18</PackageVersion>
     <Authors>Kadir Emre Parlak</Authors>
     <Company>
     </Company>

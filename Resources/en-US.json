@@ -48,6 +48,25 @@
     "negativeWord": "NEGATIVE",
     "zeroWord": "ZERO",
     "currencyFormat": "{whole} {major} {decimal} {minor}",
-    "numberFormat": "{whole} POINT {decimal}"
+    "numberFormat": "{whole} POINT {decimal}",
+    "useTeens": true,
+    "useCompoundNumbers": true
+  },
+  "specialNumbers": {
+    "teens": [
+      "ELEVEN",
+      "TWELVE",
+      "THIRTEEN",
+      "FOURTEEN",
+      "FIFTEEN",
+      "SIXTEEN",
+      "SEVENTEEN",
+      "EIGHTEEN",
+      "NINETEEN"
+    ],
+    "compoundSeparator": "-",
+    "special": {
+      "0": "ZERO"
+    }
   }
 }

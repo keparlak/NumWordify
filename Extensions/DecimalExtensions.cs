@@ -80,4 +80,30 @@ public static class DecimalExtensions
         var converter = new NumberToWordsConverter(cultureInfo);
         return converter.ConvertWithoutCurrency(number);
     }
+
+    /// <summary>
+    /// Converts a decimal number to words using the specified culture and currency.
+    /// </summary>
+    /// <param name="number">The decimal number to convert.</param>
+    /// <param name="culture">The culture to use for conversion.</param>
+    /// <param name="currency">The currency model to override the default currency.</param>
+    /// <returns>A string representing the number in words.</returns>
+    public static string ToWords(this decimal number, string culture, CurrencyModel currency)
+    {
+        var converter = new NumberToWordsConverter(culture, currency);
+        return converter.Convert(number);
+    }
+
+    /// <summary>
+    /// Converts a decimal number to words using the specified CultureInfo and currency.
+    /// </summary>
+    /// <param name="number">The decimal number to convert.</param>
+    /// <param name="cultureInfo">The CultureInfo to use for conversion.</param>
+    /// <param name="currency">The currency model to override the default currency.</param>
+    /// <returns>A string representing the number in words.</returns>
+    public static string ToWords(this decimal number, CultureInfo cultureInfo, CurrencyModel currency)
+    {
+        var converter = new NumberToWordsConverter(cultureInfo, currency);
+        return converter.Convert(number);
+    }
 }
