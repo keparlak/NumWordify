@@ -1,37 +1,70 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net9.0;net8.0;net7.0;net6.0;netstandard2.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    
+    <!-- NuGet Package Metadata -->
     <PackageId>NumWordify</PackageId>
-    <Version>1.0.18</Version>
-    <PackageVersion>1.0.18</PackageVersion>
+    <Version>1.0.0</Version>
     <Authors>Kadir Emre Parlak</Authors>
-    <Company>
-    </Company>
-    <Description>A library for converting numbers to words in multiple languages with currency support</Description>
+    <Company>keparlak</Company>
+    <Product>NumWordify</Product>
+    <Title>NumWordify - Number to Words Converter</Title>
+    <Description>A powerful .NET library for converting numbers to words with multi-language and multi-currency support. Features include:
+
+- Multi-language support (English, Turkish, French, Spanish)
+- Multi-currency support with customization
+- Special number handling (teens, compound numbers)
+- Culture-based conversions
+- Extensible localization through JSON
+- Comprehensive documentation</Description>
+    
+    <!-- Package Configuration -->
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageIcon>numwordify-icon.png</PackageIcon>
     <PackageProjectUrl>https://github.com/keparlak/NumWordify</PackageProjectUrl>
     <RepositoryUrl>https://github.com/keparlak/NumWordify</RepositoryUrl>
-    <PackageTags>number;converter;localization;currency;words</PackageTags>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>number-to-words;localization;currency;converter;multilanguage;i18n;text-conversion;number-formatting</PackageTags>
+    
+    <!-- Build Configuration -->
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <LangVersion>latest</LangVersion>
     <ApplicationIcon>favicon.ico</ApplicationIcon>
-    <PackageIcon>numwordify-icon.png</PackageIcon>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageReleaseNotes>See CHANGELOG.md for release notes.</PackageReleaseNotes>
   </PropertyGroup>
+
+  <!-- Source Link Support -->
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
   <ItemGroup>
+    <!-- Package Contents -->
     <None Include="README.md" Pack="true" PackagePath="/" />
+    <None Include="CHANGELOG.md" Pack="true" PackagePath="/" />
+    <None Include="LICENSE" Pack="true" PackagePath="/" />
     <None Include="numwordify-icon.png" Pack="true" PackagePath="/" />
+    
+    <!-- Embedded Resources -->
     <EmbeddedResource Include="Resources\*.json">
       <LogicalName>%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
-  </ItemGroup>
-  <ItemGroup>
+    
+    <!-- Content Files -->
     <Content Include="favicon.ico" />
   </ItemGroup>
+
   <ItemGroup>
+    <!-- Package Dependencies -->
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
   </ItemGroup>
 </Project>
