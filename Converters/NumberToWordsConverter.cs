@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Reflection;
+using System.Text;
 using NumWordify.Models;
 
 namespace NumWordify.Converters;
@@ -18,13 +20,48 @@ public class NumberToWordsConverter
     /// <exception cref="InvalidOperationException">Thrown when deserialization of localization data fails.</exception>
     public NumberToWordsConverter(string culture)
     {
-        var jsonPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", $"{culture}.json");
-        if (!File.Exists(jsonPath))
-            throw new FileNotFoundException($"Localization file not found for culture: {culture}");
+        var assembly = typeof(NumberToWordsConverter).Assembly;
+        var resourceName = $"{culture}.json";
 
-        var jsonContent = File.ReadAllText(jsonPath);
-        _localization = JsonSerializer.Deserialize<LocalizationModel>(jsonContent)
-            ?? throw new InvalidOperationException("Failed to deserialize localization data");
+        // List all resources for debugging
+        var resources = assembly.GetManifestResourceNames();
+
+        if (!resources.Contains(resourceName))
+        {
+            var availableCultures = resources
+                .Where(r => r.EndsWith(".json"))
+                .Select(r => r.Replace(".json", ""))
+                .ToList();
+
+            throw new FileNotFoundException(
+                $"Localization file not found for culture: {culture}. " +
+                $"Available cultures: {string.Join(", ", availableCultures)}");
+        }
+
+        using var stream = assembly.GetManifestResourceStream(resourceName);
+        if (stream == null)
+            throw new FileNotFoundException($"Failed to load resource stream for culture: {culture}");
+
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        var jsonContent = reader.ReadToEnd();
+
+        try
+        {
+            _localization = JsonSerializer.Deserialize<LocalizationModel>(jsonContent)
+                ?? throw new InvalidOperationException("Failed to deserialize localization data");
+
+            // Validate individual properties
+            if (_localization.Numbers == null)
+                throw new InvalidOperationException("Numbers property is null");
+            if (_localization.Currency == null)
+                throw new InvalidOperationException("Currency property is null");
+            if (_localization.Settings == null)
+                throw new InvalidOperationException("Settings property is null");
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException($"Failed to parse localization data for culture {culture}: {ex.Message}");
+        }
 
         ValidateLocalization();
     }

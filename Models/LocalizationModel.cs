@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace NumWordify.Models;
 
 /// <summary>
@@ -8,14 +10,17 @@ public class LocalizationModel
     /// <summary>
     /// Gets or sets the currency model for localization.
     /// </summary>
+    [JsonPropertyName("currency")]
     public CurrencyModel Currency { get; set; } = null!;
     /// <summary>
     /// Gets or sets the numbers model for localization.
     /// </summary>
+    [JsonPropertyName("numbers")]
     public NumbersModel Numbers { get; set; } = null!;
     /// <summary>
     /// Gets or sets the settings model for localization.
     /// </summary>
+    [JsonPropertyName("settings")]
     public SettingsModel Settings { get; set; } = new();
 
     /// <summary>
@@ -45,11 +50,13 @@ public class CurrencyModel
     /// <summary>
     /// Gets or sets the major currency unit.
     /// </summary>
+    [JsonPropertyName("major")]
     public string Major { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the minor currency unit.
     /// </summary>
+    [JsonPropertyName("minor")]
     public string Minor { get; set; } = null!;
 }
 
@@ -61,21 +68,25 @@ public class NumbersModel
     /// <summary>
     /// Gets or sets the words for ones.
     /// </summary>
+    [JsonPropertyName("ones")]
     public string[] Ones { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the words for tens.
     /// </summary>
+    [JsonPropertyName("tens")]
     public string[] Tens { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the words for hundreds.
     /// </summary>
+    [JsonPropertyName("hundreds")]
     public string[] Hundreds { get; set; } = null!;
 
     /// <summary>
     /// Gets or sets the words for scales.
     /// </summary>
+    [JsonPropertyName("scales")]
     public string[] Scales { get; set; } = null!;
 }
 
@@ -87,30 +98,36 @@ public class SettingsModel
     /// <summary>
     /// Gets or sets a value indicating whether to skip the word "one" for thousands.
     /// </summary>
+    [JsonPropertyName("skipOneForThousand")]
     public bool SkipOneForThousand { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether to skip the word "one" for hundreds.
     /// </summary>
+    [JsonPropertyName("skipOneForHundred")]
     public bool SkipOneForHundred { get; set; }
 
     /// <summary>
     /// Gets or sets the word used for negative numbers.
     /// </summary>
+    [JsonPropertyName("negativeWord")]
     public string NegativeWord { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the word used for zero.
     /// </summary>
+    [JsonPropertyName("zeroWord")]
     public string ZeroWord { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the format string for currency.
     /// </summary>
+    [JsonPropertyName("currencyFormat")]
     public string CurrencyFormat { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the format string for numbers.
     /// </summary>
+    [JsonPropertyName("numberFormat")]
     public string NumberFormat { get; set; } = string.Empty;
 }
