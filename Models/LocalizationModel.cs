@@ -22,6 +22,11 @@ public class LocalizationModel
     /// </summary>
     [JsonPropertyName("settings")]
     public SettingsModel Settings { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the special numbers model for localization.
+    /// </summary>
+    [JsonPropertyName("specialNumbers")]
+    public SpecialNumbersModel? SpecialNumbers { get; set; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LocalizationModel"/> class with default settings.
@@ -130,4 +135,42 @@ public class SettingsModel
     /// </summary>
     [JsonPropertyName("numberFormat")]
     public string NumberFormat { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to use special number formatting for teens (11-19).
+    /// </summary>
+    [JsonPropertyName("useTeens")]
+    public bool UseTeens { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether to use compound number formatting (e.g. twenty-one vs twenty one).
+    /// </summary>
+    [JsonPropertyName("useCompoundNumbers")]
+    public bool UseCompoundNumbers { get; set; }
+}
+
+/// <summary>
+/// Represents special number cases for different languages.
+/// </summary>
+public class SpecialNumbersModel
+{
+    /// <summary>
+    /// Gets or sets special words for numbers from 11 to 19.
+    /// If not provided, numbers will be constructed using regular rules.
+    /// </summary>
+    [JsonPropertyName("teens")]
+    public string[]? Teens { get; set; }
+
+    /// <summary>
+    /// Gets or sets special words for specific numbers.
+    /// Key is the number, value is the word representation.
+    /// </summary>
+    [JsonPropertyName("special")]
+    public Dictionary<int, string>? Special { get; set; }
+
+    /// <summary>
+    /// Gets or sets the separator for compound numbers (e.g. "-" for "twenty-one" in English).
+    /// </summary>
+    [JsonPropertyName("compoundSeparator")]
+    public string CompoundSeparator { get; set; } = " ";
 }
