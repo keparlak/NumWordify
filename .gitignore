@@ -364,4 +364,5 @@ FodyWeavers.xsd
 
 # Build and version files
 build.ps1
+nuget.config
 version.txt

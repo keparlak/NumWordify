@@ -264,7 +264,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Author
 
-Kadir Emre Parlak
+Kadir Emre Parlak - [@kep_dev](https://x.com/kep_dev)
 
 ## Support
 
