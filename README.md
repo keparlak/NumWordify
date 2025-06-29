@@ -270,7 +270,7 @@ Kadir Emre Parlak - [@kep_dev](https://x.com/kep_dev)
 
 If you encounter any issues or have questions:
 
-1. Check the [GitHub Issues](https://github.com/parlak/NumWordify/issues) for existing problems or solutions
+1. Check the [GitHub Issues](https://github.com/keparlak/NumWordify/issues) for existing problems or solutions
 2. Create a new issue if your problem is not already reported
 3. For usage questions, provide a minimal code example that demonstrates the issue
 
