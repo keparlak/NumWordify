@@ -125,6 +125,9 @@ public class NumberToWordsConverter
         if (_localization.Numbers.Hundreds.Length != 10)
             throw new InvalidOperationException("Hundreds array must contain exactly 10 elements");
 
+        if (_localization.Numbers.Scales == null || _localization.Numbers.Scales.Length == 0)
+            throw new InvalidOperationException("Scales array must contain at least 1 element");
+
         if (string.IsNullOrEmpty(_localization.Settings.CurrencyFormat))
             throw new InvalidOperationException("Currency format must be specified");
 
@@ -145,11 +148,7 @@ public class NumberToWordsConverter
     /// <returns>A string representing the number in words with currency.</returns>
     public string Convert(decimal number)
     {
-        var isNegative = number < 0;
-        number = Math.Abs(number);
-
-        var wholePart = Math.Floor(number);
-        var decimalPart = Math.Round((number - wholePart) * 100);
+        var (isNegative, wholePart, decimalPart) = SplitNumberParts(number);
 
         var wholeWords = ConvertWholeNumber(wholePart);
         var decimalWords = ConvertWholeNumber(decimalPart);
@@ -177,11 +176,7 @@ public class NumberToWordsConverter
     /// <returns>A string representing the number in words without currency.</returns>
     public string ConvertWithoutCurrency(decimal number)
     {
-        var isNegative = number < 0;
-        number = Math.Abs(number);
-
-        var wholePart = Math.Floor(number);
-        var decimalPart = Math.Round((number - wholePart) * 100);
+        var (isNegative, wholePart, decimalPart) = SplitNumberParts(number);
 
         var wholeWords = ConvertWholeNumber(wholePart);
         var decimalWords = ConvertWholeNumber(decimalPart);
@@ -210,7 +205,7 @@ public class NumberToWordsConverter
 
         var groups = new List<string>();
         var currentNumber = number;
-        currentScale = 0;
+        _currentScale = 0;
 
         while (currentNumber > 0)
         {
@@ -218,13 +213,18 @@ public class NumberToWordsConverter
             if (group > 0)
             {
                 var groupText = ConvertGroup(group);
-                if (currentScale > 0)
-                    groupText += " " + _localization.Numbers.Scales[currentScale];
+                if (_currentScale > 0)
+                {
+                    if (_currentScale >= _localization.Numbers.Scales.Length)
+                        throw new InvalidOperationException("Number is too large to convert with the current locale scale configuration.");
+
+                    groupText += " " + _localization.Numbers.Scales[_currentScale];
+                }
                 groups.Insert(0, groupText.Trim());
             }
 
             currentNumber = Math.Floor(currentNumber / 1000);
-            currentScale++;
+            _currentScale++;
         }
 
         return string.Join(" ", groups);
@@ -239,7 +239,7 @@ public class NumberToWordsConverter
         if (hundreds > 0)
         {
             if (_localization.Settings.SkipOneForHundred && hundreds == 1)
-                result.Add("YÜZ");
+                result.Add(_localization.Numbers.Hundreds[1]);
             else
                 result.Add(_localization.Numbers.Hundreds[hundreds]);
         }
@@ -284,7 +284,7 @@ public class NumberToWordsConverter
         }
         // Sadece birler basamağı varsa
         else if (ones > 0 && !(_localization.Settings.SkipOneForThousand &&
-            ones == 1 && number == 1 && currentScale == 1))
+            ones == 1 && number == 1 && _currentScale == 1))
         {
             result.Add(_localization.Numbers.Ones[ones]);
         }
@@ -292,5 +292,22 @@ public class NumberToWordsConverter
         return string.Join(" ", result).Trim();
     }
 
-    private int currentScale = 0;
+    private static (bool isNegative, decimal wholePart, decimal decimalPart) SplitNumberParts(decimal number)
+    {
+        var isNegative = number < 0;
+        number = Math.Abs(number);
+
+        var wholePart = Math.Floor(number);
+        var decimalPart = Math.Round((number - wholePart) * 100);
+
+        if (decimalPart == 100)
+        {
+            wholePart += 1;
+            decimalPart = 0;
+        }
+
+        return (isNegative, wholePart, decimalPart);
+    }
+
+    private int _currentScale = 0;
 }
