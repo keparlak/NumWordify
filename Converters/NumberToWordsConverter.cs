@@ -296,15 +296,7 @@ public class NumberToWordsConverter
     private static (bool IsNegative, decimal WholePart, decimal DecimalPart) SplitNumberParts(decimal number)
     {
         var isNegative = number < 0;
-
-        try
-        {
-            number = Math.Abs(number);
-        }
-        catch (OverflowException)
-        {
-            throw new ArgumentOutOfRangeException(nameof(number), "Input value is out of supported range.");
-        }
+        number = Math.Abs(number);
 
         var wholePart = Math.Floor(number);
         var decimalPart = Math.Round((number - wholePart) * 100);
