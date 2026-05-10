@@ -125,6 +125,9 @@ public class NumberToWordsConverter
         if (_localization.Numbers.Hundreds.Length != 10)
             throw new InvalidOperationException("Hundreds array must contain exactly 10 elements");
 
+        if (_localization.Numbers.Scales == null || _localization.Numbers.Scales.Length == 0)
+            throw new InvalidOperationException("Scales array must contain at least 1 element");
+
         if (string.IsNullOrEmpty(_localization.Settings.CurrencyFormat))
             throw new InvalidOperationException("Currency format must be specified");
 
@@ -145,11 +148,7 @@ public class NumberToWordsConverter
     /// <returns>A string representing the number in words with currency.</returns>
     public string Convert(decimal number)
     {
-        var isNegative = number < 0;
-        number = Math.Abs(number);
-
-        var wholePart = Math.Floor(number);
-        var decimalPart = Math.Round((number - wholePart) * 100);
+        var (isNegative, wholePart, decimalPart) = SplitNumberParts(number);
 
         var wholeWords = ConvertWholeNumber(wholePart);
         var decimalWords = ConvertWholeNumber(decimalPart);
@@ -177,11 +176,7 @@ public class NumberToWordsConverter
     /// <returns>A string representing the number in words without currency.</returns>
     public string ConvertWithoutCurrency(decimal number)
     {
-        var isNegative = number < 0;
-        number = Math.Abs(number);
-
-        var wholePart = Math.Floor(number);
-        var decimalPart = Math.Round((number - wholePart) * 100);
+        var (isNegative, wholePart, decimalPart) = SplitNumberParts(number);
 
         var wholeWords = ConvertWholeNumber(wholePart);
         var decimalWords = ConvertWholeNumber(decimalPart);
@@ -219,7 +214,13 @@ public class NumberToWordsConverter
             {
                 var groupText = ConvertGroup(group);
                 if (currentScale > 0)
+                {
+                    if (currentScale >= _localization.Numbers.Scales.Length)
+                        throw new InvalidOperationException(
+                            $"Number is too large for configured scales. Maximum supported scale index is {_localization.Numbers.Scales.Length - 1}.");
+
                     groupText += " " + _localization.Numbers.Scales[currentScale];
+                }
                 groups.Insert(0, groupText.Trim());
             }
 
@@ -239,7 +240,7 @@ public class NumberToWordsConverter
         if (hundreds > 0)
         {
             if (_localization.Settings.SkipOneForHundred && hundreds == 1)
-                result.Add("YÜZ");
+                result.Add(_localization.Numbers.Hundreds[1]);
             else
                 result.Add(_localization.Numbers.Hundreds[hundreds]);
         }
@@ -290,6 +291,31 @@ public class NumberToWordsConverter
         }
 
         return string.Join(" ", result).Trim();
+    }
+
+    private static (bool IsNegative, decimal WholePart, decimal DecimalPart) SplitNumberParts(decimal number)
+    {
+        var isNegative = number < 0;
+
+        try
+        {
+            number = Math.Abs(number);
+        }
+        catch (OverflowException)
+        {
+            throw new ArgumentOutOfRangeException(nameof(number), "Input value is out of supported range.");
+        }
+
+        var wholePart = Math.Floor(number);
+        var decimalPart = Math.Round((number - wholePart) * 100);
+
+        if (decimalPart == 100)
+        {
+            wholePart += 1;
+            decimalPart = 0;
+        }
+
+        return (isNegative, wholePart, decimalPart);
     }
 
     private int currentScale = 0;
