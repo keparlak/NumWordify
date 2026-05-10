@@ -205,7 +205,7 @@ public class NumberToWordsConverter
 
         var groups = new List<string>();
         var currentNumber = number;
-        currentScale = 0;
+        _currentScale = 0;
 
         while (currentNumber > 0)
         {
@@ -213,19 +213,19 @@ public class NumberToWordsConverter
             if (group > 0)
             {
                 var groupText = ConvertGroup(group);
-                if (currentScale > 0)
+                if (_currentScale > 0)
                 {
-                    if (currentScale >= _localization.Numbers.Scales.Length)
+                    if (_currentScale >= _localization.Numbers.Scales.Length)
                         throw new InvalidOperationException(
                             $"Number is too large for configured scales. Maximum supported scale index is {_localization.Numbers.Scales.Length - 1}.");
 
-                    groupText += " " + _localization.Numbers.Scales[currentScale];
+                    groupText += " " + _localization.Numbers.Scales[_currentScale];
                 }
                 groups.Insert(0, groupText.Trim());
             }
 
             currentNumber = Math.Floor(currentNumber / 1000);
-            currentScale++;
+            _currentScale++;
         }
 
         return string.Join(" ", groups);
@@ -285,7 +285,7 @@ public class NumberToWordsConverter
         }
         // Sadece birler basamağı varsa
         else if (ones > 0 && !(_localization.Settings.SkipOneForThousand &&
-            ones == 1 && number == 1 && currentScale == 1))
+            ones == 1 && number == 1 && _currentScale == 1))
         {
             result.Add(_localization.Numbers.Ones[ones]);
         }
@@ -310,5 +310,5 @@ public class NumberToWordsConverter
         return (isNegative, wholePart, decimalPart);
     }
 
-    private int currentScale = 0;
+    private int _currentScale = 0;
 }
