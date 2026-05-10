@@ -216,8 +216,7 @@ public class NumberToWordsConverter
                 if (_currentScale > 0)
                 {
                     if (_currentScale >= _localization.Numbers.Scales.Length)
-                        throw new InvalidOperationException(
-                            $"Number is too large for configured scales. Maximum supported scale index is {_localization.Numbers.Scales.Length - 1}.");
+                        throw new InvalidOperationException("Number is too large to convert with the current locale scale configuration.");
 
                     groupText += " " + _localization.Numbers.Scales[_currentScale];
                 }
@@ -293,7 +292,7 @@ public class NumberToWordsConverter
         return string.Join(" ", result).Trim();
     }
 
-    private static (bool IsNegative, decimal WholePart, decimal DecimalPart) SplitNumberParts(decimal number)
+    private static (bool isNegative, decimal wholePart, decimal decimalPart) SplitNumberParts(decimal number)
     {
         var isNegative = number < 0;
         number = Math.Abs(number);
