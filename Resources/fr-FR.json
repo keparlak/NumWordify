@@ -1,15 +1,35 @@
 {
-  "currency": {
-    "major": "EUR",
-    "minor": "Centimes"
+  "defaultCurrency": "EUR",
+  "currencies": {
+    "EUR": {
+      "major": "EUROS",
+      "majorSingular": "EURO",
+      "minor": "CENTIMES",
+      "minorSingular": "CENTIME"
+    },
+    "USD": {
+      "major": "DOLLARS",
+      "majorSingular": "DOLLAR",
+      "minor": "CENTS",
+      "minorSingular": "CENT"
+    },
+    "CHF": {
+      "major": "FRANCS",
+      "majorSingular": "FRANC",
+      "minor": "CENTIMES",
+      "minorSingular": "CENTIME"
+    }
   },
   "settings": {
-    "skipOneForThousand": false,
-    "skipOneForHundred": false,
-    "negativeWord": "NÉGATIF",
+    "skipOneForThousand": true,
+    "useExactHundredsBeforeScale": false,
+    "apocopateBeforeNoun": false,
+    "negativeWord": "MOINS",
     "zeroWord": "ZÉRO",
     "currencyFormat": "{whole} {major} {decimal} {minor}",
-    "numberFormat": "{whole} VIRGULE {decimal}"
+    "numberFormat": "{whole} VIRGULE {decimal}",
+    "decimalPlaces": 2,
+    "useTeens": true
   },
   "numbers": {
     "ones": [
@@ -39,6 +59,18 @@
     "hundreds": [
       "",
       "CENT",
+      "DEUX CENT",
+      "TROIS CENT",
+      "QUATRE CENT",
+      "CINQ CENT",
+      "SIX CENT",
+      "SEPT CENT",
+      "HUIT CENT",
+      "NEUF CENT"
+    ],
+    "exactHundreds": [
+      "",
+      "",
       "DEUX CENTS",
       "TROIS CENTS",
       "QUATRE CENTS",
@@ -48,6 +80,62 @@
       "HUIT CENTS",
       "NEUF CENTS"
     ],
-    "scales": ["", "MILLE", "MILLION", "MILLIARD", "BILLION", "BILLIARD"]
+    "scales": ["", "MILLE", "MILLION", "MILLIARD", "BILLION", "BILLIARD"],
+    "scalesPlural": ["", "", "MILLIONS", "MILLIARDS", "BILLIONS", "BILLIARDS"],
+    "scaleKinds": ["Adjective", "Adjective", "Noun", "Noun", "Noun", "Noun"]
+  },
+  "specialNumbers": {
+    "teens": [
+      "ONZE",
+      "DOUZE",
+      "TREIZE",
+      "QUATORZE",
+      "QUINZE",
+      "SEIZE",
+      "DIX-SEPT",
+      "DIX-HUIT",
+      "DIX-NEUF"
+    ],
+    "compoundSeparator": "-",
+    "special": {
+      "21": "VINGT ET UN",
+      "31": "TRENTE ET UN",
+      "41": "QUARANTE ET UN",
+      "51": "CINQUANTE ET UN",
+      "61": "SOIXANTE ET UN",
+      "70": "SOIXANTE-DIX",
+      "71": "SOIXANTE ET ONZE",
+      "72": "SOIXANTE-DOUZE",
+      "73": "SOIXANTE-TREIZE",
+      "74": "SOIXANTE-QUATORZE",
+      "75": "SOIXANTE-QUINZE",
+      "76": "SOIXANTE-SEIZE",
+      "77": "SOIXANTE-DIX-SEPT",
+      "78": "SOIXANTE-DIX-HUIT",
+      "79": "SOIXANTE-DIX-NEUF",
+      "80": "QUATRE-VINGTS",
+      "81": "QUATRE-VINGT-UN",
+      "82": "QUATRE-VINGT-DEUX",
+      "83": "QUATRE-VINGT-TROIS",
+      "84": "QUATRE-VINGT-QUATRE",
+      "85": "QUATRE-VINGT-CINQ",
+      "86": "QUATRE-VINGT-SIX",
+      "87": "QUATRE-VINGT-SEPT",
+      "88": "QUATRE-VINGT-HUIT",
+      "89": "QUATRE-VINGT-NEUF",
+      "90": "QUATRE-VINGT-DIX",
+      "91": "QUATRE-VINGT-ONZE",
+      "92": "QUATRE-VINGT-DOUZE",
+      "93": "QUATRE-VINGT-TREIZE",
+      "94": "QUATRE-VINGT-QUATORZE",
+      "95": "QUATRE-VINGT-QUINZE",
+      "96": "QUATRE-VINGT-SEIZE",
+      "97": "QUATRE-VINGT-DIX-SEPT",
+      "98": "QUATRE-VINGT-DIX-HUIT",
+      "99": "QUATRE-VINGT-DIX-NEUF"
+    },
+    "specialBeforeScale": {
+      "80": "QUATRE-VINGT"
+    }
   }
 }

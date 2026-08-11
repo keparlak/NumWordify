@@ -1,15 +1,27 @@
 {
-  "currency": {
-    "major": "EURO",
-    "minor": "SENT"
+  "deprecated": true,
+  "defaultCurrency": "EUR",
+  "currencies": {
+    "EUR": {
+      "major": "EURO",
+      "minor": "SENT"
+    },
+    "TRY": {
+      "major": "TL",
+      "minor": "Kr"
+    },
+    "USD": {
+      "major": "DOLAR",
+      "minor": "SENT"
+    }
   },
   "settings": {
     "skipOneForThousand": true,
-    "skipOneForHundred": true,
     "negativeWord": "EKSİ",
     "zeroWord": "SIFIR",
     "currencyFormat": "{whole} {major} {decimal} {minor}",
-    "numberFormat": "{whole} NOKTA {decimal}"
+    "numberFormat": "{whole} NOKTA {decimal}",
+    "decimalPlaces": 2
   },
   "numbers": {
     "ones": [
@@ -49,5 +61,8 @@
       "DOKUZ YÜZ"
     ],
     "scales": ["", "BİN", "MİLYON", "MİLYAR", "TRİLYON", "KATRİLYON"]
+  },
+  "specialNumbers": {
+    "compoundSeparator": " "
   }
 }

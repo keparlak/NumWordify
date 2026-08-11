@@ -1,15 +1,35 @@
 {
-  "currency": {
-    "major": "EUR",
-    "minor": "Céntimos"
+  "defaultCurrency": "EUR",
+  "currencies": {
+    "EUR": {
+      "major": "EUROS",
+      "majorSingular": "EURO",
+      "minor": "CÉNTIMOS",
+      "minorSingular": "CÉNTIMO"
+    },
+    "USD": {
+      "major": "DÓLARES",
+      "majorSingular": "DÓLAR",
+      "minor": "CENTAVOS",
+      "minorSingular": "CENTAVO"
+    },
+    "MXN": {
+      "major": "PESOS",
+      "majorSingular": "PESO",
+      "minor": "CENTAVOS",
+      "minorSingular": "CENTAVO"
+    }
   },
   "settings": {
-    "skipOneForThousand": false,
-    "skipOneForHundred": false,
-    "negativeWord": "NEGATIVO",
+    "skipOneForThousand": true,
+    "apocopateBeforeNoun": true,
+    "nounScaleLinkWord": "DE",
+    "negativeWord": "MENOS",
     "zeroWord": "CERO",
     "currencyFormat": "{whole} {major} {decimal} {minor}",
-    "numberFormat": "{whole} COMA {decimal}"
+    "numberFormat": "{whole} COMA {decimal}",
+    "decimalPlaces": 2,
+    "useTeens": true
   },
   "numbers": {
     "ones": [
@@ -48,6 +68,45 @@
       "OCHOCIENTOS",
       "NOVECIENTOS"
     ],
-    "scales": ["", "MIL", "MILLÓN", "MILLARDO", "BILLÓN", "BILLARDO"]
+    "exactHundreds": ["", "CIEN", "", "", "", "", "", "", "", ""],
+    "scales": ["", "MIL", "MILLÓN", "MILLARDO", "BILLÓN"],
+    "scalesPlural": ["", "", "MILLONES", "MILLARDOS", "BILLONES"],
+    "scaleKinds": ["Adjective", "Adjective", "Noun", "Noun", "Noun"]
+  },
+  "specialNumbers": {
+    "teens": [
+      "ONCE",
+      "DOCE",
+      "TRECE",
+      "CATORCE",
+      "QUINCE",
+      "DIECISÉIS",
+      "DIECISIETE",
+      "DIECIOCHO",
+      "DIECINUEVE"
+    ],
+    "compoundSeparator": " Y ",
+    "special": {
+      "21": "VEINTIUNO",
+      "22": "VEINTIDÓS",
+      "23": "VEINTITRÉS",
+      "24": "VEINTICUATRO",
+      "25": "VEINTICINCO",
+      "26": "VEINTISÉIS",
+      "27": "VEINTISIETE",
+      "28": "VEINTIOCHO",
+      "29": "VEINTINUEVE"
+    },
+    "specialBeforeScale": {
+      "1": "UN",
+      "21": "VEINTIÚN",
+      "31": "TREINTA Y UN",
+      "41": "CUARENTA Y UN",
+      "51": "CINCUENTA Y UN",
+      "61": "SESENTA Y UN",
+      "71": "SETENTA Y UN",
+      "81": "OCHENTA Y UN",
+      "91": "NOVENTA Y UN"
+    }
   }
 }
