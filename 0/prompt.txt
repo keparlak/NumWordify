@@ -1,0 +1,1 @@
+<bash-input>curl -fsSL https://entire.io/install.sh | bash</bash-input>
