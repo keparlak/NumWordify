@@ -364,5 +364,8 @@ FodyWeavers.xsd
 
 # Build and version files
 build.ps1
-nuget.config
 version.txt
+# nuget.config is deliberately NOT ignored: pinning package sources belongs in the repo,
+# and ignoring it means a supply-chain control can never be committed.
+# Build output from `dotnet pack -o out`
+out/

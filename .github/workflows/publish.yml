@@ -9,14 +9,17 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  publish:
     runs-on: ubuntu-latest
+    # Requires an environment named "nuget" holding NUGET_API_KEY, so publishing can be
+    # gated on a reviewer rather than on whoever can push a tag.
+    environment: nuget
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v3
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
             6.0.x
@@ -24,17 +27,55 @@ jobs:
             8.0.x
             9.0.x
 
-      - name: Restore dependencies
+      # The version used to be hardcoded in the csproj, so every tag produced the same
+      # package and --skip-duplicate swallowed the push while the job stayed green.
+      # NuGet drops SemVer build metadata from the package file name, so "+build" would
+      # make the verification step below look for a file that can never exist.
+      - name: Derive package version from tag
+        run: |
+          case "$GITHUB_REF_NAME" in
+            v[0-9]*)
+              ;;
+            *)
+              echo "::error::Tag '$GITHUB_REF_NAME' must be of the form v<version>, e.g. v2.0.0."
+              exit 1
+              ;;
+          esac
+
+          case "$GITHUB_REF_NAME" in
+            *+*)
+              echo "::error::Tag '$GITHUB_REF_NAME' carries SemVer build metadata, which NuGet strips from the package file name. Tag without it."
+              exit 1
+              ;;
+          esac
+
+          echo "PKG_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Restore
         run: dotnet restore
 
       - name: Build
-        run: dotnet build -c Release --no-restore
+        run: dotnet build -c Release --no-restore -p:Version="$PKG_VERSION"
 
       - name: Test
-        run: dotnet test -c Release --no-build
+        run: dotnet test tests/NumWordify.Tests/NumWordify.Tests.csproj -c Release --no-build --verbosity normal
 
       - name: Pack
-        run: dotnet pack -c Release --no-build -o out
+        run: dotnet pack NumWordify.csproj -c Release --no-build -p:Version="$PKG_VERSION" -o out
 
+      - name: Verify the package carries the tagged version
+        run: |
+          expected="out/NumWordify.${PKG_VERSION}.nupkg"
+          if [ ! -f "$expected" ]; then
+            echo "::error::Expected $expected. Produced: $(ls out)"
+            exit 1
+          fi
+
+      # No --skip-duplicate: re-publishing an existing version is a mistake worth failing on.
       - name: Push to NuGet
-        run: dotnet nuget push ./out/*.nupkg --api-key ${{secrets.NUGET_API_KEY}} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          dotnet nuget push "out/NumWordify.${PKG_VERSION}.nupkg" \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json

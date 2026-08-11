@@ -1,0 +1,26 @@
+<Project>
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <!--
+    Correctness is the product here, so the build is strict: analyzers on, warnings fatal.
+    The library shipped three silent output bugs partly because nothing ever failed a build.
+  -->
+  <PropertyGroup>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <!-- Pinned rather than "latest": with warnings fatal, a new SDK band shipping a new
+         analyzer would turn a release build red without a line of code changing, and the
+         first place that shows up is the tag push. New rules get switched on deliberately,
+         alongside the global.json bump. -->
+    <AnalysisLevel>9.0</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+</Project>
