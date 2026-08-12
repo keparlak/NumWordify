@@ -3,6 +3,57 @@
 All notable changes to this project are documented in this file.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [2.0.1] - 2026-08-13
+
+Two defects a consumer of 2.0.0 can reach through the public API. Conversion output is
+unchanged — every one of the 296 tests that shipped with 2.0.0 still produces the same
+words.
+
+### Fixed
+
+- **Exception messages printed numbers in the machine's culture, so the same failure read
+  differently on different machines.** `NumberOutOfRangeException` interpolated the
+  offending value directly: a Turkish machine reported `1000000000000000000,5`, a Swedish
+  one wrote the minus sign as U+2212 and an Arabic one used U+066B as the separator. A
+  diagnostic is not localized output. Two validation messages that can interpolate a
+  negative `decimalPlaces` or override key are fixed the same way. Conversion output was
+  never affected; the library does no culture-sensitive formatting on that path, and a
+  new test now pins that rather than leaving it true by luck.
+- **`SupportedCultures` handed out the library's own cached array, so any caller could
+  permanently corrupt it.** `NumberToWordsConverter.SupportedCultures` and
+  `LocalizationNotFoundException.AvailableCultures` returned the live `string[]` behind a
+  process-wide cache. Casting the declared `IReadOnlyList<string>` back to `string[]` and
+  writing through it rewrote the supported-culture listing *and* the text of every
+  subsequent "localization not found" message, for the life of the process. Both are now
+  genuinely read-only.
+
+### Changed
+
+- `NumberToWordsConverter.SupportedCultures` and
+  `LocalizationNotFoundException.AvailableCultures` still declare `IReadOnlyList<string>`,
+  but their runtime type is now `ReadOnlyCollection<string>` rather than `string[]`. Code
+  that cast the result to `string[]` compiled against 2.0.0 and will now throw
+  `InvalidCastException`. That cast was never supported and was the defect above, but the
+  change is invisible to the compiler and to package validation, so it is called out here
+  rather than shipped silently.
+- The build now validates the public API against the published 2.0.0 package
+  (`PackageValidationBaselineVersion`), so an accidental break fails the build instead of
+  reaching a consumer.
+
+### Not in this release
+
+Deliberately held back, so the next one has a record of why:
+
+- A validator rule cross-checking `settings.decimalPlaces` against `numbers.scales.Length`
+  would reject custom localizations that 2.0.0 accepted. Rejecting previously valid input
+  is minor-version behaviour — held for 2.1.0.
+- Replacing the converter's three "what follows this group" derivations with a single enum
+  was proposed and rejected during review: with a `scaleKinds` entry outside the declared
+  enum values — which the validator does not currently reject — the refactor changes the
+  words produced. Held until the validator checks those values.
+- The SDK pin in `global.json`, the GitHub Actions major bumps and .NET 6/7 test legs are
+  build-only, are not part of the package, and land on `master` without a release.
+
 ## [2.0.0] - 2026-08-12
 
 A correctness release. Three defects made the library produce silently wrong words, and

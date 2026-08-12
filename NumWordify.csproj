@@ -10,7 +10,7 @@
        git tag; the fallback below only applies to local builds. -->
   <PropertyGroup>
     <PackageId>NumWordify</PackageId>
-    <VersionPrefix Condition="'$(VersionPrefix)' == ''">2.0.0</VersionPrefix>
+    <VersionPrefix Condition="'$(VersionPrefix)' == ''">2.0.1</VersionPrefix>
     <Authors>Kadir Emre Parlak</Authors>
     <Company>keparlak</Company>
     <Product>NumWordify</Product>
@@ -39,11 +39,18 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <!-- Catches API surface that exists on one target framework but not another. From
-         2.1 onwards also set PackageValidationBaselineVersion to the previous release so
-         accidental breaking changes are caught by the build rather than by a consumer;
-         it is omitted here because 2.0 breaks 1.x deliberately. -->
+    <!-- Catches API surface that exists on one target framework but not another, and —
+         against the baseline below — any accidental break of the previously published
+         package. The baseline starts at 2.0.0: 1.x is not a useful comparison because 2.0
+         breaks it deliberately. A patch release is exactly where the build should prove
+         compatibility rather than a human asserting it.
+
+         Bump this to the previous release when releasing. Nothing enforces that: the
+         release version comes from the git tag, this does not, and leaving it behind only
+         weakens the check rather than failing it. It must always name a version that is
+         actually on nuget.org, because restore downloads it. -->
     <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>2.0.0</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <!-- Source Link only has something to resolve on a real CI checkout; locally the

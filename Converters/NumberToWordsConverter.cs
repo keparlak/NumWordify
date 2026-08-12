@@ -631,7 +631,7 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
         5 => 100_000m,
         6 => 1_000_000m,
         _ => throw new InvalidLocalizationException(
-            $"decimalPlaces must be between 0 and 6, but is {exponent}. " +
+            $"decimalPlaces must be between 0 and 6, but is {exponent.ToString(CultureInfo.InvariantCulture)}. " +
             "A localization must not be mutated after it has been given to a converter."),
     };
 

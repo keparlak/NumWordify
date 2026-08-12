@@ -1,3 +1,6 @@
+using System.Collections.ObjectModel;
+using System.Globalization;
+
 namespace NumWordify.Exceptions;
 
 /// <summary>
@@ -38,7 +41,11 @@ public sealed class LocalizationNotFoundException : NumWordifyException
         : base($"Localization not found for culture '{culture}'. Available cultures: {string.Join(", ", availableCultures)}.")
     {
         Culture = culture;
-        AvailableCultures = availableCultures;
+        // Copied rather than aliased. Skipping the copy when the argument is already a
+        // ReadOnlyCollection would look free, but that type is a read-only *view*: the
+        // array or list behind it stays writable through the reference the caller kept,
+        // so the payload of an exception could still change after it was thrown.
+        AvailableCultures = new ReadOnlyCollection<string>(availableCultures.ToArray());
     }
 
     /// <summary>Gets the culture that could not be resolved.</summary>
@@ -120,7 +127,10 @@ public sealed class NumberOutOfRangeException : NumWordifyException
     /// <param name="value">The number that could not be converted.</param>
     /// <param name="maximumScaleCount">The number of scale words the locale defines.</param>
     public NumberOutOfRangeException(decimal value, int maximumScaleCount)
-        : base($"The number {value} is too large for this locale: it defines {maximumScaleCount} scale word(s), " +
+        // The value is formatted invariantly: a diagnostic is not localized output, and
+        // the same failure must read the same way on every machine.
+        : base($"The number {value.ToString(CultureInfo.InvariantCulture)} is too large for this locale: " +
+               $"it defines {maximumScaleCount} scale word(s), " +
                $"so the largest convertible value is 10^{maximumScaleCount * 3} - 1.")
     {
         Value = value;
