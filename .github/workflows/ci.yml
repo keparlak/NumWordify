@@ -18,15 +18,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Windows is not optional here: the library does culture-sensitive string work
-        # and Turkish casing behaves differently across platforms.
+        # Windows is not optional here: it is the only leg that runs the test suite
+        # against net48, and therefore the only one that exercises the netstandard2.0
+        # assembly .NET Framework consumers actually get from the package. It also runs
+        # under NLS rather than ICU, which formats numbers differently from Linux.
         os: [ubuntu-latest, windows-latest]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: |
             6.0.x
