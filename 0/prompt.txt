@@ -1,0 +1,9 @@
+Entire önemli değil şuan sadece şuan numwordify için olması gereken noktada mıyız öyleysek birleştirip paketin yeni yayınını izleyelim
+
+---
+
+repo ayarlarında nuget içinde NUGET_API_KEY diye bişey yok görünüyor?[Image #2]
+
+---
+
+[Image #4] Nuget apikey'e not recommended olarak işaretlemiş başka bir best practice'i falan var mı bunun güncel durumu araştır ona göre ilerleyelim.
