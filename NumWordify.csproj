@@ -1,26 +1,28 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <TargetFrameworks>net9.0;net8.0;net7.0;net6.0;netstandard2.0</TargetFrameworks>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    
-    <!-- NuGet Package Metadata -->
+    <RootNamespace>NumWordify</RootNamespace>
+    <AssemblyName>NumWordify</AssemblyName>
+  </PropertyGroup>
+
+  <!-- NuGet package metadata. The version is supplied by the release workflow from the
+       git tag; the fallback below only applies to local builds. -->
+  <PropertyGroup>
     <PackageId>NumWordify</PackageId>
-    <Version>1.0.0</Version>
+    <VersionPrefix Condition="'$(VersionPrefix)' == ''">2.0.0</VersionPrefix>
     <Authors>Kadir Emre Parlak</Authors>
     <Company>keparlak</Company>
     <Product>NumWordify</Product>
     <Title>NumWordify - Number to Words Converter</Title>
-    <Description>A powerful .NET library for converting numbers to words with multi-language and multi-currency support. Features include:
+    <Description>A .NET library for converting numbers to words with multi-language and multi-currency support.
 
-- Multi-language support (English, Turkish, French, Spanish)
-- Multi-currency support with customization
-- Special number handling (teens, compound numbers)
-- Culture-based conversions
-- Extensible localization through JSON
-- Comprehensive documentation</Description>
-    
-    <!-- Package Configuration -->
+- Languages: English, Turkish, French, Spanish
+- Multi-currency, with per-locale currency maps and custom currency overrides
+- Irregular number handling: teens, vigesimal forms, apocope, plural scale words
+- Culture-based conversion from a culture code or CultureInfo
+- Fully extensible through JSON or a localization model you build yourself
+- Immutable, thread-safe converters with cached localization parsing</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>numwordify-icon.png</PackageIcon>
@@ -28,43 +30,59 @@
     <RepositoryUrl>https://github.com/keparlak/NumWordify</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>number-to-words;localization;currency;converter;multilanguage;i18n;text-conversion;number-formatting</PackageTags>
-    
-    <!-- Build Configuration -->
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageReleaseNotes>See CHANGELOG.md for release notes.</PackageReleaseNotes>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <LangVersion>latest</LangVersion>
-    <ApplicationIcon>favicon.ico</ApplicationIcon>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <PackageReleaseNotes>See CHANGELOG.md for release notes.</PackageReleaseNotes>
+    <!-- Catches API surface that exists on one target framework but not another. From
+         2.1 onwards also set PackageValidationBaselineVersion to the previous release so
+         accidental breaking changes are caught by the build rather than by a consumer;
+         it is omitted here because 2.0 breaks 1.x deliberately. -->
+    <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
 
-  <!-- Source Link Support -->
+  <!-- Source Link only has something to resolve on a real CI checkout; locally the
+       remote may not be an https git URL, which would otherwise warn on every build. -->
   <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' != 'true'">
+    <EnableSourceLink>false</EnableSourceLink>
+    <EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>
+  </PropertyGroup>
+
+  <!-- The test project lives under the repository root; keep it out of the library. -->
+  <ItemGroup>
+    <Compile Remove="tests/**" />
+    <None Remove="tests/**" />
+    <EmbeddedResource Remove="tests/**" />
+  </ItemGroup>
 
   <ItemGroup>
-    <!-- Package Contents -->
+    <InternalsVisibleTo Include="NumWordify.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="/" />
     <None Include="CHANGELOG.md" Pack="true" PackagePath="/" />
     <None Include="LICENSE" Pack="true" PackagePath="/" />
     <None Include="numwordify-icon.png" Pack="true" PackagePath="/" />
-    
-    <!-- Embedded Resources -->
+
     <EmbeddedResource Include="Resources\*.json">
       <LogicalName>%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
-    
-    <!-- Content Files -->
-    <Content Include="favicon.ico" />
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Package Dependencies -->
-    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <!-- System.Text.Json ships in the box from .NET Core 3.0 onwards; only the
+         netstandard2.0 target needs the package. -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
   </ItemGroup>
+
 </Project>

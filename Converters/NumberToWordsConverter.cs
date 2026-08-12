@@ -1,313 +1,664 @@
-using System.Text.Json;
-using System.Reflection;
-using System.Text;
 using System.Globalization;
+using System.Text.RegularExpressions;
+using NumWordify.Exceptions;
 using NumWordify.Models;
 
 namespace NumWordify.Converters;
 
 /// <summary>
-/// Provides functionality to convert numbers to their word representation based on localization settings.
+/// Converts numbers to their word representation using a localization ruleset.
 /// </summary>
-public class NumberToWordsConverter
+/// <remarks>
+/// <para>
+/// Instances are immutable and stateless: conversion keeps no per-call state on the
+/// object, so a single converter can be shared freely between threads and registered as
+/// a singleton. Localizations loaded from a culture name are parsed once and cached for
+/// the process, which makes constructing a converter cheap enough to do per call.
+/// </para>
+/// <para>
+/// The one caveat applies to <see cref="LocalizationModel"/> instances you build
+/// yourself: the converter keeps a reference rather than a copy, so the model must not
+/// be mutated after it has been handed over.
+/// </para>
+/// </remarks>
+public sealed class NumberToWordsConverter : INumberToWordsConverter
 {
+    private const string CustomLocalizationSource = "caller-supplied LocalizationModel";
+
+    // The captured leading space lets an empty placeholder take its own separator with
+    // it, instead of leaving a double space behind for a blanket whitespace collapse to
+    // clean up — which would also eat separators a locale meant to keep.
+    private static readonly Regex PlaceholderPattern = new(
+        @"( ?)\{(whole|decimal|major|minor)\}",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     private readonly LocalizationModel _localization;
-    private CurrencyModel? _overriddenCurrency;
+    private readonly CurrencyModel? _overriddenCurrency;
+    private readonly string _requestedCulture;
+    private readonly string _resolvedCulture;
+    private readonly bool _localeCurrencyApplies;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class using the specified culture.
+    /// Gets the culture names shipped with the library, excluding deprecated ones.
     /// </summary>
-    /// <param name="culture">The culture code to use for localization (e.g., "en-US").</param>
-    /// <exception cref="FileNotFoundException">Thrown when the localization file for the specified culture is not found.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when deserialization of localization data fails.</exception>
+    public static IReadOnlyList<string> SupportedCultures => LocalizationLoader.SupportedCultures;
+
+    /// <summary>
+    /// Determines whether the library can convert numbers for the given culture.
+    /// </summary>
+    /// <param name="culture">The culture code to test, for example <c>"en-US"</c>.</param>
+    /// <returns><see langword="true"/> when a localization resolves for the culture.</returns>
+    /// <remarks>
+    /// Useful before handing over <see cref="CultureInfo.CurrentCulture"/>, which is not
+    /// guaranteed to be one of the supported cultures. A culture can resolve through
+    /// language fallback — <c>es-MX</c> resolves to the Spanish number words — in which
+    /// case the locale's default currency does not apply and must be supplied explicitly.
+    /// </remarks>
+    public static bool IsCultureSupported(string? culture) => LocalizationLoader.IsSupported(culture);
+
+    /// <summary>
+    /// Determines whether the library can convert numbers for the given culture.
+    /// </summary>
+    /// <param name="cultureInfo">The culture to test.</param>
+    /// <returns><see langword="true"/> when a localization resolves for the culture.</returns>
+    public static bool IsCultureSupported(CultureInfo? cultureInfo) =>
+        cultureInfo is not null && LocalizationLoader.IsSupported(cultureInfo.Name);
+
+    /// <summary>
+    /// Determines whether the library can convert numbers for the given culture, and
+    /// whether <see cref="Convert(decimal)"/> can name a currency for it.
+    /// </summary>
+    /// <param name="culture">The culture code to test, for example <c>"en-US"</c>.</param>
+    /// <param name="currencyApplies">When this method returns, contains
+    /// <see langword="true"/> when the resolved locale's default currency applies to the
+    /// requested culture. When <see langword="false"/>, <see cref="Convert(decimal)"/>
+    /// throws unless a currency is supplied to the constructor;
+    /// <see cref="ConvertWithoutCurrency(decimal)"/> works either way.</param>
+    /// <returns><see langword="true"/> when a localization resolves for the culture.</returns>
+    /// <remarks>
+    /// This is the overload to use before handing over
+    /// <see cref="CultureInfo.CurrentCulture"/>. Resolving is not the same question as
+    /// converting with currency: <c>en-GB</c> resolves to the English number words, but
+    /// their default currency is the US dollar, so it is not the right one for a British
+    /// amount and the library refuses to guess.
+    /// </remarks>
+    public static bool IsCultureSupported(string? culture, out bool currencyApplies) =>
+        LocalizationLoader.IsSupported(culture, out currencyApplies);
+
+    /// <summary>
+    /// Determines whether the library can convert numbers for the given culture, and
+    /// whether <see cref="Convert(decimal)"/> can name a currency for it.
+    /// </summary>
+    /// <param name="cultureInfo">The culture to test.</param>
+    /// <param name="currencyApplies">When this method returns, contains
+    /// <see langword="true"/> when the resolved locale's default currency applies to the
+    /// requested culture.</param>
+    /// <returns><see langword="true"/> when a localization resolves for the culture.</returns>
+    public static bool IsCultureSupported(CultureInfo? cultureInfo, out bool currencyApplies) =>
+        LocalizationLoader.IsSupported(cultureInfo?.Name, out currencyApplies);
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class for a culture.
+    /// </summary>
+    /// <param name="culture">The culture code, for example <c>"en-US"</c>. Matching is
+    /// case-insensitive and falls back to another variant of the same language.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="culture"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="culture"/> is empty or whitespace.</exception>
+    /// <exception cref="LocalizationNotFoundException">No localization matches the culture.</exception>
+    /// <exception cref="InvalidLocalizationException">The localization resource is invalid.</exception>
     public NumberToWordsConverter(string culture)
+        : this(LocalizationLoader.Resolve(culture), culture)
     {
-        var assembly = typeof(NumberToWordsConverter).Assembly;
-        var resourceName = $"{culture}.json";
-
-        // List all resources for debugging
-        var resources = assembly.GetManifestResourceNames();
-
-        if (!resources.Contains(resourceName))
-        {
-            var availableCultures = resources
-                .Where(r => r.EndsWith(".json"))
-                .Select(r => r.Replace(".json", ""))
-                .ToList();
-
-            throw new FileNotFoundException(
-                $"Localization file not found for culture: {culture}. " +
-                $"Available cultures: {string.Join(", ", availableCultures)}");
-        }
-
-        using var stream = assembly.GetManifestResourceStream(resourceName);
-        if (stream == null)
-            throw new FileNotFoundException($"Failed to load resource stream for culture: {culture}");
-
-        using var reader = new StreamReader(stream, Encoding.UTF8);
-        var jsonContent = reader.ReadToEnd();
-
-        try
-        {
-            _localization = JsonSerializer.Deserialize<LocalizationModel>(jsonContent)
-                ?? throw new InvalidOperationException("Failed to deserialize localization data");
-
-            // Validate individual properties
-            if (_localization.Numbers == null)
-                throw new InvalidOperationException("Numbers property is null");
-            if (_localization.Currency == null)
-                throw new InvalidOperationException("Currency property is null");
-            if (_localization.Settings == null)
-                throw new InvalidOperationException("Settings property is null");
-        }
-        catch (JsonException ex)
-        {
-            throw new InvalidOperationException($"Failed to parse localization data for culture {culture}: {ex.Message}");
-        }
-
-        ValidateLocalization();
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class using the specified localization model.
+    /// The one place the four resolution fields are written. Every public constructor
+    /// reaches the same state through here, so there is a single answer to "which
+    /// localization, matched how closely, for which requested culture".
     /// </summary>
-    /// <param name="localization">The localization model to use for number conversion.</param>
-    /// <exception cref="InvalidOperationException">Thrown when the localization model is invalid.</exception>
+    private NumberToWordsConverter(ResolvedLocalization resolved, string requestedCulture)
+    {
+        _localization = resolved.Model;
+        _requestedCulture = requestedCulture;
+        _resolvedCulture = resolved.CultureName;
+        _localeCurrencyApplies = resolved.RegionMatches;
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class for a culture.
+    /// </summary>
+    /// <param name="cultureInfo">The culture to use.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="cultureInfo"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">The culture has an empty name, as
+    /// <see cref="CultureInfo.InvariantCulture"/> does.</exception>
+    /// <exception cref="LocalizationNotFoundException">No localization matches the culture.</exception>
+    public NumberToWordsConverter(CultureInfo cultureInfo)
+        : this((cultureInfo ?? throw new ArgumentNullException(nameof(cultureInfo))).Name)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class for a
+    /// culture, overriding the currency.
+    /// </summary>
+    /// <param name="culture">The culture code to use.</param>
+    /// <param name="currency">The currency that replaces the locale default.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="currency"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidLocalizationException">The currency is incomplete.</exception>
+    public NumberToWordsConverter(string culture, CurrencyModel currency)
+        : this(culture)
+    {
+        _overriddenCurrency = ValidatedOverride(currency);
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class for a
+    /// culture, overriding the currency.
+    /// </summary>
+    /// <param name="cultureInfo">The culture to use.</param>
+    /// <param name="currency">The currency that replaces the locale default.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="currency"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidLocalizationException">The currency is incomplete.</exception>
+    public NumberToWordsConverter(CultureInfo cultureInfo, CurrencyModel currency)
+        : this(cultureInfo)
+    {
+        _overriddenCurrency = ValidatedOverride(currency);
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class for a
+    /// culture, selecting one of the currencies the locale defines.
+    /// </summary>
+    /// <param name="culture">The culture code to use.</param>
+    /// <param name="currencyCode">An ISO 4217 code listed in the locale's <c>currencies</c> map,
+    /// for example <c>"EUR"</c>.</param>
+    /// <exception cref="ArgumentException">The locale does not define the currency code.</exception>
+    public NumberToWordsConverter(string culture, string currencyCode)
+        : this(culture)
+    {
+        _overriddenCurrency = ResolveCurrencyCode(_localization, _resolvedCulture, currencyCode);
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class for a
+    /// culture, selecting one of the currencies the locale defines.
+    /// </summary>
+    /// <param name="cultureInfo">The culture to use.</param>
+    /// <param name="currencyCode">An ISO 4217 code listed in the locale's <c>currencies</c> map.</param>
+    /// <exception cref="ArgumentException">The locale does not define the currency code.</exception>
+    public NumberToWordsConverter(CultureInfo cultureInfo, string currencyCode)
+        : this(cultureInfo)
+    {
+        _overriddenCurrency = ResolveCurrencyCode(_localization, _resolvedCulture, currencyCode);
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class from a
+    /// localization you supply.
+    /// </summary>
+    /// <param name="localization">The localization ruleset. Must not be mutated afterwards.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="localization"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidLocalizationException">The localization is incomplete or inconsistent.</exception>
     public NumberToWordsConverter(LocalizationModel localization)
-    {
-        _localization = localization;
-        ValidateLocalization();
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class using the specified CultureInfo.
-    /// </summary>
-    /// <param name="cultureInfo">The CultureInfo to use for localization.</param>
-    /// <exception cref="FileNotFoundException">Thrown when the localization file for the specified culture is not found.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when deserialization of localization data fails.</exception>
-    public NumberToWordsConverter(CultureInfo cultureInfo) : this(cultureInfo.Name)
+        : this(ValidatedCustom(localization), CustomLocalizationSource)
     {
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class using the specified culture and currency.
+    /// Wraps a caller-supplied model as a resolution result. A model handed over directly
+    /// was not matched to anything, so its currency always applies.
     /// </summary>
-    /// <param name="culture">The culture code to use for localization (e.g., "tr-TR").</param>
-    /// <param name="currency">The currency model to override the default currency.</param>
-    public NumberToWordsConverter(string culture, CurrencyModel currency) : this(culture)
+    private static ResolvedLocalization ValidatedCustom(LocalizationModel localization)
     {
-        _overriddenCurrency = currency;
+        if (localization is null)
+            throw new ArgumentNullException(nameof(localization));
+
+        LocalizationValidator.Validate(localization, CustomLocalizationSource);
+        return new ResolvedLocalization(localization, CustomLocalizationSource, regionMatches: true);
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class using the specified CultureInfo and currency.
+    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class from a
+    /// localization you supply, overriding the currency.
     /// </summary>
-    /// <param name="cultureInfo">The CultureInfo to use for localization.</param>
-    /// <param name="currency">The currency model to override the default currency.</param>
-    public NumberToWordsConverter(CultureInfo cultureInfo, CurrencyModel currency) : this(cultureInfo)
+    /// <param name="localization">The localization ruleset. Must not be mutated afterwards.</param>
+    /// <param name="currency">The currency that replaces the model default.</param>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidLocalizationException">The localization or currency is incomplete.</exception>
+    public NumberToWordsConverter(LocalizationModel localization, CurrencyModel currency)
+        : this(localization)
     {
-        _overriddenCurrency = currency;
+        _overriddenCurrency = ValidatedOverride(currency);
     }
 
     /// <summary>
-    /// Gets the current currency model being used for conversion.
+    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class from a
+    /// localization you supply, selecting one of the currencies it defines.
     /// </summary>
-    private CurrencyModel CurrentCurrency => _overriddenCurrency ?? _localization.Currency;
-
-    private void ValidateLocalization()
+    /// <param name="localization">The localization ruleset. Must not be mutated afterwards.</param>
+    /// <param name="currencyCode">A key into the model's <see cref="LocalizationModel.Currencies"/>.</param>
+    /// <exception cref="ArgumentException">The model does not define the currency code.</exception>
+    public NumberToWordsConverter(LocalizationModel localization, string currencyCode)
+        : this(localization)
     {
-        if (_localization.Numbers.Ones.Length != 10)
-            throw new InvalidOperationException("Ones array must contain exactly 10 elements");
-
-        if (_localization.Numbers.Tens.Length != 10)
-            throw new InvalidOperationException("Tens array must contain exactly 10 elements");
-
-        if (_localization.Numbers.Hundreds.Length != 10)
-            throw new InvalidOperationException("Hundreds array must contain exactly 10 elements");
-
-        if (_localization.Numbers.Scales == null || _localization.Numbers.Scales.Length == 0)
-            throw new InvalidOperationException("Scales array must contain at least 1 element");
-
-        if (string.IsNullOrEmpty(_localization.Settings.CurrencyFormat))
-            throw new InvalidOperationException("Currency format must be specified");
-
-        if (string.IsNullOrEmpty(_localization.Settings.ZeroWord))
-            throw new InvalidOperationException("Zero word must be specified");
-
-        if (string.IsNullOrEmpty(_localization.Settings.NegativeWord))
-            throw new InvalidOperationException("Negative word must be specified");
-
-        if (string.IsNullOrEmpty(_localization.Settings.NumberFormat))
-            throw new InvalidOperationException("Number format must be specified");
+        _overriddenCurrency = ResolveCurrencyCode(_localization, CustomLocalizationSource, currencyCode);
     }
 
     /// <summary>
-    /// Converts a decimal number to its word representation including currency.
+    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class from a
+    /// set of options, which is the only overload that covers every combination at once.
     /// </summary>
-    /// <param name="number">The decimal number to convert.</param>
-    /// <returns>A string representing the number in words with currency.</returns>
-    public string Convert(decimal number)
+    /// <param name="options">Culture, localization and currency settings. Nothing is
+    /// retained from the instance itself, so it can be reused or mutated afterwards.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
+    /// <exception cref="LocalizationNotFoundException">No localization matches the culture.</exception>
+    /// <exception cref="InvalidLocalizationException">The localization or currency is incomplete.</exception>
+    /// <exception cref="ArgumentException">The locale does not define
+    /// <see cref="WordifyOptions.CurrencyCode"/>.</exception>
+    public NumberToWordsConverter(WordifyOptions options)
+        : this(ResolveOptions(options), RequestedCultureOf(options))
     {
-        var (isNegative, wholePart, decimalPart) = SplitNumberParts(number);
-
-        var wholeWords = ConvertWholeNumber(wholePart);
-        var decimalWords = ConvertWholeNumber(decimalPart);
-
-        if (string.IsNullOrEmpty(wholeWords))
-            wholeWords = _localization.Settings.ZeroWord;
-
-        if (string.IsNullOrEmpty(decimalWords))
-            decimalWords = _localization.Settings.ZeroWord;
-
-        var result = _localization.Settings.CurrencyFormat
-            .Replace("{whole}", wholeWords)
-            .Replace("{major}", CurrentCurrency.Major)
-            .Replace("{decimal}", decimalWords)
-            .Replace("{minor}", CurrentCurrency.Minor)
-            .Trim();
-
-        return isNegative ? $"{_localization.Settings.NegativeWord} {result}" : result;
+        // Honouring Currency but silently dropping CurrencyCode would make the same
+        // mistake an error on one path and invisible on the other.
+        _overriddenCurrency =
+            options.Currency is { } currency ? ValidatedOverride(currency)
+            : options.CurrencyCode is { } currencyCode
+                ? ResolveCurrencyCode(_localization, _resolvedCulture, currencyCode)
+                : null;
     }
+
+    private static ResolvedLocalization ResolveOptions(WordifyOptions options)
+    {
+        if (options is null)
+            throw new ArgumentNullException(nameof(options));
+
+        return options.Localization is { } localization
+            ? ValidatedCustom(localization)
+            : LocalizationLoader.Resolve(options.Culture);
+    }
+
+    private static string RequestedCultureOf(WordifyOptions options) =>
+        options.Localization is null ? options.Culture : CustomLocalizationSource;
 
     /// <summary>
-    /// Converts a decimal number to its word representation without including currency.
+    /// Converts a number to words including its currency units.
     /// </summary>
-    /// <param name="number">The decimal number to convert.</param>
-    /// <returns>A string representing the number in words without currency.</returns>
-    public string ConvertWithoutCurrency(decimal number)
+    /// <param name="number">The number to convert. The fractional part is rounded to
+    /// <see cref="SettingsModel.DecimalPlaces"/> digits, away from zero.</param>
+    /// <returns>The number in words, with currency.</returns>
+    /// <exception cref="NumberOutOfRangeException">The number needs more scale words than the
+    /// locale defines.</exception>
+    /// <exception cref="AmbiguousCurrencyException">The culture resolved through language
+    /// fallback, so the locale's default currency cannot be assumed to be the right one.</exception>
+    /// <exception cref="InvalidLocalizationException">The localization has no currency and none
+    /// was supplied to the constructor.</exception>
+    public string Convert(decimal number) =>
+        Render(number, _localization.Settings.CurrencyFormat, ResolveCurrency(), DecimalReadingMode.Fraction);
+
+    /// <summary>
+    /// Converts a number to words without any currency units.
+    /// </summary>
+    /// <param name="number">The number to convert. The fractional part is rounded to
+    /// <see cref="SettingsModel.DecimalPlaces"/> digits, away from zero.</param>
+    /// <returns>The number in words, without currency.</returns>
+    /// <exception cref="NumberOutOfRangeException">The number needs more scale words than the
+    /// locale defines.</exception>
+    public string ConvertWithoutCurrency(decimal number) =>
+        Render(number, _localization.Settings.NumberFormat, currency: null, _localization.Settings.DecimalReading);
+
+    private CurrencyModel ResolveCurrency()
     {
-        var (isNegative, wholePart, decimalPart) = SplitNumberParts(number);
+        if (_overriddenCurrency is { } overridden)
+            return overridden;
 
-        var wholeWords = ConvertWholeNumber(wholePart);
-        var decimalWords = ConvertWholeNumber(decimalPart);
+        // es-MX resolves to the Spanish number words, whose default currency is the euro.
+        // Printing "EUROS" for a Mexican amount is exactly the kind of silent wrongness
+        // this library exists to avoid, so it has to be an error.
+        if (!_localeCurrencyApplies)
+            throw new AmbiguousCurrencyException(_requestedCulture, _resolvedCulture);
 
-        if (string.IsNullOrEmpty(wholeWords))
-            wholeWords = _localization.Settings.ZeroWord;
+        if (_localization.DefaultCurrency is { } key)
+            return ResolveCurrencyCode(_localization, _resolvedCulture, key);
 
-        if (string.IsNullOrEmpty(decimalWords))
-            decimalWords = _localization.Settings.ZeroWord;
-
-        var result = _localization.Settings.NumberFormat
-            .Replace("{whole}", wholeWords)
-            .Replace("{decimal}", decimalWords)
-            .Trim();
-
-        return isNegative ? $"{_localization.Settings.NegativeWord} {result}" : result;
+        throw new InvalidLocalizationException(
+            "This localization defines no currency. Set 'defaultCurrency' to one of the entries in " +
+            "'currencies', supply a CurrencyModel to the constructor, or call " +
+            "ConvertWithoutCurrency instead.");
     }
 
-    private string ConvertWholeNumber(decimal number)
+    private static CurrencyModel ValidatedOverride(CurrencyModel currency)
     {
-        if (number < 0)
-            throw new ArgumentException("Number should be positive in ConvertWholeNumber");
+        if (currency is null)
+            throw new ArgumentNullException(nameof(currency));
 
-        if (number == 0)
-            return "";
+        LocalizationValidator.ValidateCurrency(currency, "currency", "caller-supplied CurrencyModel");
+        return currency;
+    }
 
-        var groups = new List<string>();
-        var currentNumber = number;
-        _currentScale = 0;
+    private string Render(decimal number, string template, CurrencyModel? currency, DecimalReadingMode readingMode)
+    {
+        var settings = _localization.Settings;
+        var (isNegative, wholePart, fractionPart) = SplitNumberParts(number, settings.DecimalPlaces);
+        var currencyFollows = currency is not null;
 
-        while (currentNumber > 0)
+        var wholeWords = ConvertWholeNumber(wholePart, number, currencyFollows, out var endsWithNounScale);
+        if (wholeWords.Length == 0)
         {
-            var group = (int)(currentNumber % 1000);
+            wholeWords = settings.ZeroWord;
+        }
+        else if (currencyFollows && endsWithNounScale && !string.IsNullOrEmpty(settings.NounScaleLinkWord))
+        {
+            // "UN MILLÓN DE EUROS", but "UN MILLÓN QUINIENTOS MIL EUROS".
+            wholeWords += " " + settings.NounScaleLinkWord;
+        }
+
+        var fractionWords = readingMode == DecimalReadingMode.Digits
+            ? ReadFractionDigits(fractionPart, settings.DecimalPlaces)
+            : ConvertWholeNumber(fractionPart, number, currencyFollows, out _);
+        if (fractionWords.Length == 0)
+            fractionWords = settings.ZeroWord;
+
+        // One pass over the template, so a currency name that happens to contain "{minor}"
+        // is emitted literally instead of being treated as another placeholder.
+        var rendered = PlaceholderPattern.Replace(template, match =>
+        {
+            var value = match.Groups[2].Value switch
+            {
+                "whole" => wholeWords,
+                "decimal" => fractionWords,
+                "major" => currency is null ? string.Empty : Inflect(currency.Major, currency.MajorSingular, wholePart),
+                "minor" => currency is null ? string.Empty : Inflect(currency.Minor, currency.MinorSingular, fractionPart),
+                _ => match.Value,
+            };
+
+            return value.Length == 0 ? string.Empty : match.Groups[1].Value + value;
+        });
+
+        var result = rendered.Trim();
+
+        if (!isNegative)
+            return result;
+
+        return result.Length == 0
+            ? settings.NegativeWord
+            : settings.NegativeWord + " " + result;
+    }
+
+    private static string Inflect(string plural, string? singular, decimal value) =>
+        value == 1m && !string.IsNullOrEmpty(singular) ? singular! : plural;
+
+    private ScaleKind KindOf(int scale)
+    {
+        var kinds = _localization.Numbers!.ScaleKinds;
+        return kinds is not null && scale < kinds.Length ? kinds[scale] : ScaleKind.Adjective;
+    }
+
+    private string ConvertWholeNumber(
+        decimal value,
+        decimal originalNumber,
+        bool currencyFollows,
+        out bool endsWithNounScale)
+    {
+        endsWithNounScale = false;
+
+        if (value == 0m)
+            return string.Empty;
+
+        var scales = _localization.Numbers!.Scales;
+        var groups = new List<string>();
+        var remaining = value;
+        var scale = 0;
+        var isLowestGroup = true;
+
+        while (remaining > 0m)
+        {
+            var group = (int)(remaining % 1000m);
             if (group > 0)
             {
-                var groupText = ConvertGroup(group);
-                if (_currentScale > 0)
-                {
-                    if (_currentScale >= _localization.Numbers.Scales.Length)
-                        throw new InvalidOperationException("Number is too large to convert with the current locale scale configuration.");
+                if (scale >= scales.Length)
+                    throw new NumberOutOfRangeException(originalNumber, scales.Length);
 
-                    groupText += " " + _localization.Numbers.Scales[_currentScale];
+                var scaleIsNoun = scale > 0 && KindOf(scale) == ScaleKind.Noun;
+                var followedByNoun = scale > 0 ? scaleIsNoun : currencyFollows;
+
+                var text = ConvertGroup(group, scale, followedByNoun);
+                if (scale > 0)
+                {
+                    var scaleWord = ScaleWord(scale, group);
+                    text = text.Length == 0 ? scaleWord : text + " " + scaleWord;
                 }
-                groups.Insert(0, groupText.Trim());
+
+                if (text.Length > 0)
+                    groups.Insert(0, text);
+
+                if (isLowestGroup)
+                {
+                    endsWithNounScale = scaleIsNoun;
+                    isLowestGroup = false;
+                }
             }
 
-            currentNumber = Math.Floor(currentNumber / 1000);
-            _currentScale++;
+            remaining = Math.Floor(remaining / 1000m);
+            scale++;
         }
 
         return string.Join(" ", groups);
     }
 
-    private string ConvertGroup(int number)
+    private string ScaleWord(int scale, int group)
     {
-        var result = new List<string>();
+        var numbers = _localization.Numbers!;
 
-        // Yüzler basamağı
+        if (group > 1 && numbers.ScalesPlural is { } plural && plural[scale].Length > 0)
+            return plural[scale];
+
+        return numbers.Scales[scale];
+    }
+
+    private string ConvertGroup(int number, int scale, bool followedByNoun)
+    {
         var hundreds = number / 100;
-        if (hundreds > 0)
-        {
-            if (_localization.Settings.SkipOneForHundred && hundreds == 1)
-                result.Add(_localization.Numbers.Hundreds[1]);
-            else
-                result.Add(_localization.Numbers.Hundreds[hundreds]);
-        }
-
-        // Onlar ve birler basamağı
         var remainder = number % 100;
+        var parts = new List<string>(2);
 
-        // Özel sayılar için kontrol (11-19 arası)
-        if (remainder >= 11 && remainder <= 19 &&
-            _localization.Settings.UseTeens &&
-            _localization.SpecialNumbers?.Teens != null)
+        if (hundreds > 0)
+            parts.Add(HundredsWord(hundreds, remainder, scale));
+
+        // A group whose last two digits are zero contributes no tens/ones word at all,
+        // which is why the override maps are never consulted with a key of 0.
+        if (remainder > 0)
         {
-            result.Add(_localization.SpecialNumbers.Teens[remainder - 11]);
-            return string.Join(" ", result);
+            var word = TensAndOnesWord(remainder, number, scale, followedByNoun);
+            if (word.Length > 0)
+                parts.Add(word);
         }
 
-        // Özel sayılar sözlüğünde varsa direkt kullan
-        if (_localization.SpecialNumbers?.Special?.ContainsKey(remainder) == true)
+        return string.Join(" ", parts);
+    }
+
+    private string HundredsWord(int hundreds, int remainder, int scale)
+    {
+        var numbers = _localization.Numbers!;
+
+        if (remainder == 0 && numbers.ExactHundreds is { } exact && exact[hundreds].Length > 0)
         {
-            result.Add(_localization.SpecialNumbers.Special[remainder]);
-            return string.Join(" ", result);
+            // A noun scale word ends the numeral phrase, so French keeps the plural in
+            // "DEUX CENTS MILLIONS" but drops it in "DEUX CENT MILLE".
+            var endsNumeralPhrase = scale == 0 || KindOf(scale) == ScaleKind.Noun;
+
+            if (endsNumeralPhrase || _localization.Settings.UseExactHundredsBeforeScale)
+                return exact[hundreds];
         }
 
+        return numbers.Hundreds[hundreds];
+    }
+
+    /// <summary>
+    /// Resolves the last two digits of a group. The order of the checks is the priority
+    /// order: dropping "one" before the thousands scale wins over every override, an
+    /// override that only applies before a following word wins over a general one, a
+    /// general override wins over the teens table, and regular construction is the
+    /// fallback.
+    /// </summary>
+    private string TensAndOnesWord(int remainder, int groupValue, int scale, bool followedByNoun)
+    {
+        return DropOneBeforeThousand(remainder, groupValue, scale)
+            ?? OverrideBeforeFollowingWord(remainder, scale, followedByNoun)
+            ?? GeneralOverride(remainder)
+            ?? Teen(remainder)
+            ?? Regular(remainder);
+    }
+
+    // "bin" rather than "bir bin", "mille" rather than "un mille".
+    private string? DropOneBeforeThousand(int remainder, int groupValue, int scale) =>
+        scale == 1 && groupValue == 1 && remainder == 1 && _localization.Settings.SkipOneForThousand
+            ? string.Empty
+            : null;
+
+    private string? OverrideBeforeFollowingWord(int remainder, int scale, bool followedByNoun)
+    {
+        if (_localization.SpecialNumbers?.SpecialBeforeScale is not { } overrides)
+            return null;
+
+        // French drops the plural of "vingt" only before a numeral adjective, Spanish
+        // apocopates only before a noun. Both are "before a following word", but they
+        // pick opposite sides of that split.
+        var beforeNumeralAdjective = scale > 0 && KindOf(scale) == ScaleKind.Adjective;
+        var beforeNoun = followedByNoun && _localization.Settings.ApocopateBeforeNoun;
+
+        if (!beforeNumeralAdjective && !beforeNoun)
+            return null;
+
+        return overrides.TryGetValue(remainder, out var word) ? word : null;
+    }
+
+    private string? GeneralOverride(int remainder) =>
+        _localization.SpecialNumbers?.Special is { } overrides && overrides.TryGetValue(remainder, out var word)
+            ? word
+            : null;
+
+    private string? Teen(int remainder)
+    {
+        var special = _localization.SpecialNumbers;
+        var useTeens = _localization.Settings.UseTeens ?? special?.Teens is not null;
+
+        return useTeens && remainder is >= 11 and <= 19 && special?.Teens is { } teens
+            ? teens[remainder - 11]
+            : null;
+    }
+
+    private string Regular(int remainder)
+    {
+        var numbers = _localization.Numbers!;
         var tens = remainder / 10;
         var ones = remainder % 10;
 
-        if (tens > 0)
-        {
-            var tensWord = _localization.Numbers.Tens[tens];
+        if (tens == 0)
+            return numbers.Ones[ones];
 
-            // Birler basamağı varsa ve compound numbers kullanılıyorsa
-            if (ones > 0 && _localization.Settings.UseCompoundNumbers)
-            {
-                var separator = _localization.SpecialNumbers?.CompoundSeparator ?? " ";
-                tensWord += separator + _localization.Numbers.Ones[ones];
-                result.Add(tensWord);
-            }
-            else
-            {
-                result.Add(tensWord);
-            }
-        }
-        // Sadece birler basamağı varsa
-        else if (ones > 0 && !(_localization.Settings.SkipOneForThousand &&
-            ones == 1 && number == 1 && _currentScale == 1))
-        {
-            result.Add(_localization.Numbers.Ones[ones]);
-        }
+        var word = numbers.Tens[tens];
+        if (ones > 0)
+            word += (_localization.SpecialNumbers?.CompoundSeparator ?? " ") + numbers.Ones[ones];
 
-        return string.Join(" ", result).Trim();
+        return word;
     }
 
-    private static (bool isNegative, decimal wholePart, decimal decimalPart) SplitNumberParts(decimal number)
+    private string ReadFractionDigits(decimal fraction, int decimalPlaces)
     {
-        var isNegative = number < 0;
-        number = Math.Abs(number);
+        if (decimalPlaces == 0 || fraction == 0m)
+            return string.Empty;
 
-        var wholePart = Math.Floor(number);
-        var decimalPart = Math.Round((number - wholePart) * 100);
+        var digits = ((long)fraction)
+            .ToString(CultureInfo.InvariantCulture)
+            .PadLeft(decimalPlaces, '0')
+            .TrimEnd('0');
 
-        if (decimalPart == 100)
+        if (digits.Length == 0)
+            return string.Empty;
+
+        var numbers = _localization.Numbers!;
+        var words = new List<string>(digits.Length);
+
+        foreach (var character in digits)
         {
-            wholePart += 1;
-            decimalPart = 0;
+            var digit = character - '0';
+            words.Add(digit == 0 ? _localization.Settings.ZeroWord : numbers.Ones[digit]);
         }
 
-        return (isNegative, wholePart, decimalPart);
+        return string.Join(" ", words);
     }
 
-    private int _currentScale = 0;
+    private static (bool IsNegative, decimal Whole, decimal Fraction) SplitNumberParts(
+        decimal number,
+        int decimalPlaces)
+    {
+        var isNegative = number < 0m;
+        var magnitude = Math.Abs(number);
+
+        if (decimalPlaces == 0)
+        {
+            var rounded = Math.Round(magnitude, 0, MidpointRounding.AwayFromZero);
+            return (isNegative && rounded != 0m, rounded, 0m);
+        }
+
+        var whole = Math.Floor(magnitude);
+        var factor = Pow10(decimalPlaces);
+
+        // Money rounds away from zero; the framework default (to even) would turn
+        // 1.005 into one dollar zero cents.
+        var fraction = Math.Round((magnitude - whole) * factor, MidpointRounding.AwayFromZero);
+
+        if (fraction >= factor)
+        {
+            whole += 1m;
+            fraction = 0m;
+        }
+
+        // -0.001 rounds to zero, and "negative zero" is not a thing anyone wants printed.
+        if (whole == 0m && fraction == 0m)
+            isNegative = false;
+
+        return (isNegative, whole, fraction);
+    }
+
+    private static decimal Pow10(int exponent) => exponent switch
+    {
+        0 => 1m,
+        1 => 10m,
+        2 => 100m,
+        3 => 1_000m,
+        4 => 10_000m,
+        5 => 100_000m,
+        6 => 1_000_000m,
+        _ => throw new InvalidLocalizationException(
+            $"decimalPlaces must be between 0 and 6, but is {exponent}. " +
+            "A localization must not be mutated after it has been given to a converter."),
+    };
+
+    private static CurrencyModel ResolveCurrencyCode(
+        LocalizationModel localization,
+        string culture,
+        string currencyCode)
+    {
+        if (currencyCode is null)
+            throw new ArgumentNullException(nameof(currencyCode));
+
+        if (localization.Currencies is { } currencies)
+        {
+            foreach (var pair in currencies)
+            {
+                if (string.Equals(pair.Key, currencyCode, StringComparison.OrdinalIgnoreCase))
+                    return pair.Value;
+            }
+        }
+
+        var available = localization.Currencies is null || localization.Currencies.Count == 0
+            ? "none"
+            : string.Join(", ", localization.Currencies.Keys.OrderBy(key => key, StringComparer.Ordinal));
+
+        throw new ArgumentException(
+            $"Culture '{culture}' does not define the currency '{currencyCode}'. Currencies defined: {available}. " +
+            "Pass a CurrencyModel instead to use a currency the locale does not know.",
+            nameof(currencyCode));
+    }
 }

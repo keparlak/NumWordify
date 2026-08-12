@@ -1,0 +1,47 @@
+name: CI
+
+# Nothing used to build or test before a merge; the release tag was the first time any
+# code was compiled. This runs on every change instead.
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is not optional here: the library does culture-sensitive string work
+        # and Turkish casing behaves differently across platforms.
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.0.x
+            7.0.x
+            8.0.x
+            9.0.x
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
+      - name: Test
+        run: dotnet test tests/NumWordify.Tests/NumWordify.Tests.csproj -c Release --no-build --verbosity normal
+
+      - name: Pack (verifies package validation and metadata)
+        run: dotnet pack NumWordify.csproj -c Release --no-build -o out

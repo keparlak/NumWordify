@@ -1,7 +1,37 @@
 {
-  "currency": {
-    "major": "USD",
-    "minor": "Cents"
+  "defaultCurrency": "USD",
+  "currencies": {
+    "USD": {
+      "major": "DOLLARS",
+      "majorSingular": "DOLLAR",
+      "minor": "CENTS",
+      "minorSingular": "CENT"
+    },
+    "EUR": {
+      "major": "EUROS",
+      "majorSingular": "EURO",
+      "minor": "CENTS",
+      "minorSingular": "CENT"
+    },
+    "GBP": {
+      "major": "POUNDS",
+      "majorSingular": "POUND",
+      "minor": "PENCE",
+      "minorSingular": "PENNY"
+    },
+    "TRY": {
+      "major": "TURKISH LIRA",
+      "minor": "KURUS"
+    }
+  },
+  "settings": {
+    "skipOneForThousand": false,
+    "negativeWord": "NEGATIVE",
+    "zeroWord": "ZERO",
+    "currencyFormat": "{whole} {major} {decimal} {minor}",
+    "numberFormat": "{whole} POINT {decimal}",
+    "decimalPlaces": 2,
+    "useTeens": true
   },
   "numbers": {
     "ones": [
@@ -42,16 +72,6 @@
     ],
     "scales": ["", "THOUSAND", "MILLION", "BILLION", "TRILLION", "QUADRILLION"]
   },
-  "settings": {
-    "skipOneForThousand": false,
-    "skipOneForHundred": false,
-    "negativeWord": "NEGATIVE",
-    "zeroWord": "ZERO",
-    "currencyFormat": "{whole} {major} {decimal} {minor}",
-    "numberFormat": "{whole} POINT {decimal}",
-    "useTeens": true,
-    "useCompoundNumbers": true
-  },
   "specialNumbers": {
     "teens": [
       "ELEVEN",
@@ -64,9 +84,6 @@
       "EIGHTEEN",
       "NINETEEN"
     ],
-    "compoundSeparator": "-",
-    "special": {
-      "0": "ZERO"
-    }
+    "compoundSeparator": "-"
   }
 }

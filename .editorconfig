@@ -1,0 +1,81 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+[*.{cs,csx}]
+indent_size = 4
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.{csproj,props,targets}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+# Language conventions
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_style_var_for_built_in_types = true:silent
+csharp_style_var_when_type_is_apparent = true:silent
+csharp_style_expression_bodied_methods = when_on_single_line:silent
+csharp_prefer_braces = when_multiline:silent
+csharp_style_prefer_switch_expression = true:suggestion
+csharp_style_prefer_pattern_matching = true:suggestion
+dotnet_style_prefer_conditional_expression_over_assignment = true:silent
+dotnet_style_prefer_conditional_expression_over_return = true:silent
+dotnet_sort_system_directives_first = true
+
+# Naming: private fields are _camelCase
+dotnet_naming_rule.private_fields_underscore.severity = warning
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel_case
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_fields.required_modifiers =
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+
+# Public API of a library ships XML docs.
+dotnet_diagnostic.CS1591.severity = warning
+
+# String comparisons must say what they mean — this library resolves resource names by
+# string and got case sensitivity wrong once already.
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CA1307.severity = warning
+dotnet_diagnostic.CA1310.severity = warning
+
+# CA1304 fires on the converter's own constructor overloads: it sees a (string) and a
+# (CultureInfo) overload and assumes the string one reads the ambient culture, when the
+# string IS the culture name. It does not currently guard anything else in this code base
+# — there is no ToLower/ToUpper/CompareTo call for it to catch — but if one is ever added,
+# CA1311 and CA1310 below still cover the Turkish-I trap that motivated the rule.
+dotnet_diagnostic.CA1304.severity = none
+dotnet_diagnostic.CA1311.severity = warning
+
+# CA1510 suggests ArgumentNullException.ThrowIfNull, which does not exist on
+# netstandard2.0 — one of the target frameworks.
+dotnet_diagnostic.CA1510.severity = none
+dotnet_diagnostic.CA1512.severity = none
+
+# CA1865 wants IndexOf(char) where CA1307 wants an explicit StringComparison, and the
+# char overload that takes one does not exist on netstandard2.0. Explicitness wins.
+dotnet_diagnostic.CA1865.severity = none
+
+# Exception types here are deliberately not serializable; the legacy serialization
+# constructor is obsolete on modern targets.
+dotnet_diagnostic.CA2237.severity = none
+dotnet_diagnostic.CA1032.severity = none
+
+[tests/**/*.cs]
+# Test method names read as sentences, and test data is intentionally literal.
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA5394.severity = none
