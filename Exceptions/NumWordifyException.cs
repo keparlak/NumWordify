@@ -41,11 +41,11 @@ public sealed class LocalizationNotFoundException : NumWordifyException
         : base($"Localization not found for culture '{culture}'. Available cultures: {string.Join(", ", availableCultures)}.")
     {
         Culture = culture;
-        // Never store an array the caller can still reach: the list the library passes
-        // here is its process-wide cache, and writing through it would rewrite the text
-        // of every exception thrown afterwards.
-        AvailableCultures = availableCultures as ReadOnlyCollection<string>
-            ?? new ReadOnlyCollection<string>(availableCultures.ToArray());
+        // Copied rather than aliased. Skipping the copy when the argument is already a
+        // ReadOnlyCollection would look free, but that type is a read-only *view*: the
+        // array or list behind it stays writable through the reference the caller kept,
+        // so the payload of an exception could still change after it was thrown.
+        AvailableCultures = new ReadOnlyCollection<string>(availableCultures.ToArray());
     }
 
     /// <summary>Gets the culture that could not be resolved.</summary>

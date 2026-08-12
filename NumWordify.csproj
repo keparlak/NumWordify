@@ -43,7 +43,12 @@
          against the baseline below — any accidental break of the previously published
          package. The baseline starts at 2.0.0: 1.x is not a useful comparison because 2.0
          breaks it deliberately. A patch release is exactly where the build should prove
-         compatibility rather than a human asserting it. -->
+         compatibility rather than a human asserting it.
+
+         Bump this to the previous release when releasing. Nothing enforces that: the
+         release version comes from the git tag, this does not, and leaving it behind only
+         weakens the check rather than failing it. It must always name a version that is
+         actually on nuget.org, because restore downloads it. -->
     <EnablePackageValidation>true</EnablePackageValidation>
     <PackageValidationBaselineVersion>2.0.0</PackageValidationBaselineVersion>
   </PropertyGroup>

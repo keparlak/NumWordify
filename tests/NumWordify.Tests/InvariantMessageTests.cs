@@ -12,12 +12,20 @@ namespace NumWordify.Tests;
 /// formatted its number with <see cref="CultureInfo.CurrentCulture"/> shipped unnoticed.
 /// </summary>
 /// <remarks>
-/// The cultures are chosen to fail differently: tr-TR uses a comma for the decimal
+/// <para>
+/// The cultures are chosen to fail differently on ICU: tr-TR uses a comma for the decimal
 /// separator, sv-SE uses U+2212 for the minus sign rather than the ASCII hyphen, and
-/// ar-SA uses U+066B for the separator and prefixes negatives with U+061C. Every
-/// assertion below is on the invariant text, never on what the hostile culture produces,
-/// so the NLS/ICU differences between the .NET Framework and .NET legs cannot make these
-/// flaky.
+/// ar-SA uses U+066B for the separator and prefixes negatives with U+061C. Every assertion
+/// is on the invariant text, never on what the hostile culture produces, so these cannot
+/// go flaky when the two legs disagree.
+/// </para>
+/// <para>
+/// They do not all discriminate on both legs, which is worth stating rather than implying.
+/// .NET Framework 4.8 uses NLS, where no installed culture formats a negative integer
+/// differently from invariant and ar-SA formats decimals identically to invariant — so on
+/// that leg the ar-SA rows and the whole of the validation-message test pass whether or
+/// not the fix is present. The .NET legs carry those cases.
+/// </para>
 /// </remarks>
 [Collection("Culture")]
 public class InvariantMessageTests
@@ -77,15 +85,38 @@ public class InvariantMessageTests
         Assert.Contains("contains the key -5.", overrideKey.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void The_mutated_localization_guard_reports_the_bad_value_invariantly()
+    {
+        // The one message in the converter itself that formats a number. Reaching it means
+        // mutating a model after handing it over, which the type documents as forbidden —
+        // the guard exists because doing it used to fail obscurely much later.
+        var localization = TestLocalizations.EnglishWithoutCurrency();
+        var converter = new NumberToWordsConverter(localization);
+
+        localization.Settings.DecimalPlaces = -1;
+
+        var exception = UnderCulture("sv-SE", () =>
+            Assert.Throws<InvalidLocalizationException>(() => converter.ConvertWithoutCurrency(1.5m)));
+
+        Assert.Contains("but is -1.", exception.Message, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("tr-TR")]
     [InlineData("sv-SE")]
     [InlineData("ar-SA")]
     public void Conversion_output_does_not_depend_on_the_machine_culture(string machineCulture)
     {
+        // Pins the CONVERSION path only. The parse and validation path is out of reach
+        // from here: localizations are cached process-wide, so by the time this runs the
+        // shipped models were already parsed under whatever culture the first test to
+        // touch them happened to hold. A culture-sensitive call added inside the loader
+        // would not show up in this comparison.
+        //
         // True today only because every comparison in the library carries an explicit
         // Ordinal and the one number-to-string on the output path is invariant. Nothing
-        // pinned that, so a future culture-sensitive call would go unnoticed.
+        // pinned even that much, so a future culture-sensitive call would go unnoticed.
         var invariant = UnderCulture(CultureInfo.InvariantCulture.Name, Convert);
         var hostile = UnderCulture(machineCulture, Convert);
 

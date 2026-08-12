@@ -44,7 +44,7 @@ public class CachedListImmutabilityTests
     }
 
     [Fact]
-    public void A_caller_supplied_culture_list_is_snapshotted_by_the_exception()
+    public void A_caller_supplied_culture_array_is_snapshotted_by_the_exception()
     {
         var supplied = new[] { "aa-AA", "bb-BB" };
         var exception = new LocalizationNotFoundException("xx-XX", supplied);
@@ -53,5 +53,20 @@ public class CachedListImmutabilityTests
 
         Assert.Equal(["aa-AA", "bb-BB"], exception.AvailableCultures);
         Assert.IsType<ReadOnlyCollection<string>>(exception.AvailableCultures);
+    }
+
+    [Fact]
+    public void A_caller_supplied_read_only_view_is_snapshotted_too()
+    {
+        // ReadOnlyCollection is a read-only view, not an immutable collection. Storing one
+        // by reference would leave the exception's payload writable through the list the
+        // caller kept — the same aliasing this class exists to rule out, one level down.
+        var backing = new List<string> { "aa-AA", "bb-BB" };
+        var exception = new LocalizationNotFoundException("xx-XX", new ReadOnlyCollection<string>(backing));
+
+        backing[0] = "MUTATED";
+        backing.Add("cc-CC");
+
+        Assert.Equal(["aa-AA", "bb-BB"], exception.AvailableCultures);
     }
 }
