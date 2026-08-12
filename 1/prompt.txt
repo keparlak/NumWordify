@@ -1,0 +1,412 @@
+entire ile en son kaldığımız sessionı aç
+
+---
+
+kayıp oturumu entire'a bağla. sonra da 1 ile devam et
+
+---
+
+<task-notification>
+<task-id>abe07039a0421b05c</task-id>
+<tool-use-id>toolu_01FXh7ugu1QqdMgEoexQvVMn</tool-use-id>
+<output-file>C:\Users\empad\AppData\Local\Temp\claude\C--Users-empad-Desktop-Development-entire-numwordify\806ff40c-d20c-4f2d-940c-ba9eede27e70\tasks\abe07039a0421b05c.output</output-file>
+<status>completed</status>
+<summary>Agent "Thermo code-quality review" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I have everything I need. Here is my review.
+
+---
+
+# Deep Code Quality Audit — `fix/v2-correctness-overhaul` (PR #3, NumWordify 2.0.0)
+
+Verified locally: clean build under `TreatWarningsAsErrors`, **277 tests green** on net9.0 / net8.0 / net48.
+
+## 0. The central question, answered with measurements
+
+Two prior rounds asked for a rule engine. I measured the code before judging it.
+
+`Converters/NumberToWordsConverter.cs` — 585 lines total:
+
+| | lines |
+|---|---|
+| XML doc comments | 132 |
+| blank | 91 |
+| `//` comments | 20 |
+| **actual code** | **342** |
+
+Of those 342, roughly 90 are the nine constructors and their plumbing. **The conversion algorithm itself is about 200 lines.**
+
+Per-method control flow (measured, `Converters/NumberToWordsConverter.cs`):
+
+```
+ConvertWholeNumber   L316  lines=51  branch-tokens=7  max nesting=4
+Render               L258  lines=48  branch-tokens=4  max nesting=3
+SplitNumberParts     L511  lines=32  branch-tokens=3  max nesting=2
+ResolveCurrencyCode  L558  lines=26  branch-tokens=4  max nesting=4
+ResolveCurrency      L227  lines=21  branch-tokens=5  max nesting=2
+ConvertGroup         L378  lines=20  branch-tokens=3  max nesting=2
+HundredsWord         L399  lines=16  branch-tokens=2  max nesting=2
+TensAndOnesWord      L423  lines= 8  branch-tokens=0  max nesting=1
+```
+
+No method exceeds 51 lines. Maximum nesting depth anywhere in the file is 4, in one method. There is no cyclomatic hot spot.
+
+More importantly — **`TensAndOnesWord` (L423–430) is already a rule engine**, and a better one than a JSON-driven engine would be:
+
+```csharp
+return DropOneBeforeThousand(remainder, groupValue, scale)
+    ?? OverrideBeforeFollowingWord(remainder, scale, followedByNoun)
+    ?? GeneralOverride(remainder)
+    ?? Teen(remainder)
+    ?? Regular(remainder);
+```
+
+Five named, single-purpose, individually-testable rules; explicit priority order; documented in the XML doc directly above; total cost 8 lines; fully type-checked. That is the entire value proposition of a rule engine, delivered without the engine.
+
+**The prior reviews diagnosed the wrong problem.** The limitation in this library is not tangled branching. It is **schema expressiveness** — and a rule engine does not fix that. I proved this empirically rather than asserting it.
+
+### Empirical test: can a new language be added without touching C#?
+
+I built the best possible Russian localization expressible in the current schema (scratchpad only, no repo files touched) and ran it against the library:
+
+```
+value     actual                            required Russian
+1         OK    ОДИН РУБЛЬ                  ОДИН РУБЛЬ
+2         WRONG ДВА РУБЛЕЙ                  ДВА РУБЛЯ        (paucal "few")
+5         OK    ПЯТЬ РУБЛЕЙ                 ПЯТЬ РУБЛЕЙ
+21        WRONG ДВАДЦАТЬ ОДИН РУБЛЕЙ        ДВАДЦАТЬ ОДИН РУБЛЬ  (n%10==1)
+111       OK    СТО ОДИННАДЦАТЬ РУБЛЕЙ      СТО ОДИННАДЦАТЬ РУБЛЕЙ
+1000      WRONG ОДИН ТЫСЯЧА                 ОДНА ТЫСЯЧА      (feminine)
+2000      WRONG ДВА ТЫСЯЧ                   ДВЕ ТЫСЯЧИ       (feminine + few)
+5000      OK    ПЯТЬ ТЫСЯЧ                  ПЯТЬ ТЫСЯЧ
+2000000   WRONG ДВА МИЛЛИОНОВ               ДВА МИЛЛИОНА     (few)
+5000000   OK    ПЯТЬ МИЛЛИОНОВ              ПЯТЬ МИЛЛИОНОВ
+```
+
+**5 of 10 fail, and every failure traces to exactly two missing concepts:**
+
+1. **Plural category.** `ScaleWord` (L368–376) hardcodes `group &gt; 1`, and `Inflect` (L307–308) hardcodes `value == 1m`. Both are 2-way. Russian/Polish need 3 (`one`/`few`/`many`), Arabic needs 4 (with a dual). Selection depends on `n % 10` and `n % 100`.
+2. **Gender agreement with the following scale word.** `SpecialNumbers.SpecialBeforeScale` is one flat `Dictionary&lt;int,string&gt;` applied before *any* scale of a given kind. Russian needs `ОДНА/ДВЕ` before `ТЫСЯЧА` but `ОДИН/ДВА` before `МИЛЛИОН` — i.e. keyed per scale index (or per grammatical gender), which the schema cannot express.
+
+Neither is a branching problem. Both are **data-model extensions of maybe 40–60 lines** — and the first one *deletes* complexity: a proper `PluralCategory` selector subsumes `ScalesPlural`, `MajorSingular` and `MinorSingular` as special cases of one general mechanism.
+
+A JSON rule engine would meanwhile destroy the single strongest asset in this PR: `LocalizationValidator.cs` (227 code lines) whose stated and delivered guarantee is *"a model that passes here can never fail later with a NullReferenceException or IndexOutOfRangeException from deep inside the conversion loop."* Predicates and actions expressed in JSON cannot be validated that way, cannot be type-checked, and cannot be unit-tested individually. That would be a strict regression.
+
+**Credit where due:** `README.md` L209–215 ("Known limitations") already documents the French elision gap, Spanish gender, the dual/paucal gap, and German word-order inversion — accurately and without spin. This is unusually honest documentation and it materially de-risks the release.
+
+---
+
+## 1. Structural findings — should fix before tagging 2.0.0
+
+These are all small, mechanical, and behavior-preserving. None requires the rule engine.
+
+### 1.1 Two `[Obsolete]` properties scheduled for removal "in 3.0" — inside a 2.0 major release
+
+`Models/SettingsModel.cs` L134–148: `UseCompoundNumbers` and `SkipOneForHundred`, both marked `[Obsolete("Has no effect... will be removed in 3.0")]`.
+
+This is backwards. A major version is precisely the window in which removing them is free, and it is the window you are standing in right now. Deferring to 3.0 means the 2.0 public surface permanently ships two properties documented as doing nothing, plus two JSON keys silently ignored on load.
+
+I verified deletion is completely free:
+- **No shipped resource sets either key** (scanned all five `Resources/*.json`).
+- `System.Text.Json` ignores unmapped members by default, so a 1.x JSON file that still carries them keeps loading.
+- No test references either (grepped all 19 test files: `*** NONE ***`).
+
+**Delete both.** −15 lines, −2 public API members, one fewer "why is this here" for every future reader.
+
+### 1.2 `Currency` **and** `DefaultCurrency` — resolve the duality now
+
+Yes, this is a design smell, and yes, it should be resolved before 2.0.0. The evidence is unusually clear-cut:
+
+- **No shipped resource uses `currency`.** All five use `defaultCurrency` + `currencies` (I scanned every top-level key).
+- `Models/LocalizationModel.cs` L14–17 — the property's own XML doc tells you not to use it: *"Prefer `DefaultCurrency`… naming it twice is how the two copies drift apart."* A model that documents one of its own fields as the wrong choice should not have that field.
+- `LocalizationValidator.cs` L171–176 exists solely to police a mutual exclusion that a better type would make unrepresentable.
+- `ResolveCurrency()` (L238–242) carries a two-branch ladder purely for this duality.
+- The public convenience constructor `LocalizationModel(CurrencyModel, NumbersModel, SettingsModel?)` L78–83 sets the discouraged one.
+
+**Recommendation:** delete `LocalizationModel.Currency`. Keep `Currencies` as the single storage and `DefaultCurrency` as the single selector. The convenience constructor writes into the map:
+
+```csharp
+public LocalizationModel(CurrencyModel currency, NumbersModel numbers, SettingsModel? settings = null)
+{
+    Currencies = new Dictionary&lt;string, CurrencyModel&gt; { ["DEFAULT"] = currency };
+    DefaultCurrency = "DEFAULT";
+    Numbers = numbers;
+    Settings = settings ?? new SettingsModel();
+}
+```
+
+Net: −1 public property, −10 validator lines, −1 branch in the hot path, and **one** way to name a default currency instead of two. Worth roughly 20 lines and, more importantly, one fewer invariant to police forever.
+
+### 1.3 The 3×3 constructor matrix is implemented three times
+
+This is the largest genuine duplication in the diff.
+
+- `NumberToWordsConverter` has **9 constructors** = {`string culture`, `CultureInfo`, `LocalizationModel`} × {none, `CurrencyModel`, `string currencyCode`}.
+- `DecimalExtensions` has **13 overloads** mirroring the same matrix.
+- `DecimalExtensions.CreateConverter` (L145–169, 25 lines, 5 branches) **re-derives the same dispatch a third time**, and re-states precedence rules ("Localization over Culture", "Currency over CurrencyCode") that are already documented in `WordifyOptions`' XML docs.
+
+`WordifyOptions` is *already* the canonical product type for this matrix. It just is not wired to the converter.
+
+**Code judo:**
+
+1. Add `public NumberToWordsConverter(WordifyOptions options)` as the single canonical resolution point.
+2. Delete `CreateConverter` entirely; `ToWords(options)` becomes `new NumberToWordsConverter(options).Convert(number)`.
+
+Net: **−25 lines of branching, one dispatch policy instead of three.** The precedence rules then live in exactly one place. (The ctor must read the options and retain nothing from it, to preserve the documented immutability.)
+
+While you are there: 22 public entry points (9 ctors + 13 extensions) for a two-operation library is a lot of surface to support forever. 2.0 is the free window to trim it.
+
+### 1.4 Six `null!` suppressions papering over a boundary the type system could express
+
+`_localization.Numbers!` appears **6 times** (L312, 327, 370, 401, 472, 499), each preceded by a line like `var numbers = _localization.Numbers!;`.
+
+The invariant is real: after `LocalizationValidator.Validate`, `Numbers` is never null. But the type still says `NumbersModel?`, so every consumer re-asserts it. This is exactly the "silent fallback papering over an unclear invariant" pattern — except here it's a suppression rather than a fallback, which is at least honest, just repetitive.
+
+**Fix:** capture once in the constructors, where validation just ran.
+
+```csharp
+private readonly NumbersModel _numbers;
+private readonly SettingsModel _settings;
+// in each root ctor, after validation:
+_numbers  = _localization.Numbers!;   // exactly one ! , at the boundary
+_settings = _localization.Settings;
+```
+
+Every method then reads `_numbers` / `_settings` directly. Net: **−6 suppressions, −8 local-variable lines**, and the "validated" boundary becomes visible in the field declarations. This is consistent with the already-documented "must not be mutated after handover" contract, and does not defeat the `Pow10` guard (which reads a property, not a replaced object).
+
+### 1.5 "What follows this group" is computed three different ways
+
+This is the one place where the converter genuinely earns the "scattered special case" criticism, and it is cheap to fix.
+
+The same concept is re-derived in three places with three different encodings:
+
+- `ConvertWholeNumber` L341–342: `scaleIsNoun` / `followedByNoun`
+- `HundredsWord` L407: `endsNumeralPhrase = scale == 0 || KindOf(scale) == ScaleKind.Noun`
+- `OverrideBeforeFollowingWord` L446–447: `beforeNumeralAdjective` / `beforeNoun`
+
+`KindOf(scale)` is called from three separate sites. On top of that, `ConvertWholeNumber` uses an `out bool endsWithNounScale` that one of its two call sites discards as `out _` (L277) — a classic sign the return type is wrong.
+
+**Code judo:** compute the concept once, name it, thread it through.
+
+```csharp
+private enum Following { Nothing, NumeralAdjective, Noun }
+```
+
+At scale 0: `currencyFollows ? Following.Noun : Following.Nothing`. At scale &gt; 0: `KindOf(scale) == ScaleKind.Noun ? Following.Noun : Following.NumeralAdjective`.
+
+Then, provably equivalent:
+- `HundredsWord`: `endsNumeralPhrase = following != Following.NumeralAdjective`
+- `OverrideBeforeFollowingWord`: `beforeNumeralAdjective = following == Following.NumeralAdjective`; `beforeNoun = following == Following.Noun &amp;&amp; ApocopateBeforeNoun`
+- the out-param becomes `endsWithNounScale = scale &gt; 0 &amp;&amp; following == Following.Noun`
+
+And change `ConvertWholeNumber` to return `(string Words, bool EndsWithNounScale)` so the `out _` disappears.
+
+Net: three ad-hoc boolean derivations collapse into one named enum computed once, `KindOf` is called from one site instead of three, and the out-param goes away. This is the single highest-leverage readability change in the file.
+
+---
+
+## 2. Smaller findings
+
+**2.1 Dead defensive branches in the `Render` replacer.** `NumberToWordsConverter.cs` L289–290: `currency is null ? string.Empty : Inflect(...)`. These arms are unreachable. `Render` is only called with `currency == null` for `NumberFormat`, and `LocalizationValidator.ValidateFormat` rejects `{major}`/`{minor}` in `numberFormat` (only `["whole","decimal"]` are allowed). The null check exists because the parameter type is `CurrencyModel?` while the real invariant is "currency is non-null iff the template mentions `{major}`/`{minor}`". Worth a comment at minimum; better, split `Render` so the invariant is structural.
+
+**2.2 The placeholder whitespace rule is coherent but narrower than it looks.** `PlaceholderPattern` L31–33 with the captured leading space. Given §2.1, the *only* live case is a `CurrencyModel` with `Major = ""` or `Minor = ""` (legal — the validator rejects null but permits empty). `{whole}` and `{decimal}` can never be empty because both fall back to the validated-non-empty `ZeroWord`. So this is a correct addition, well-commented, serving one narrow real case. Minor gap: the regex captures at most one leading space, so a template with two spaces before a placeholder would leave a stray internal space that `.Trim()` cannot reach. Templates are author-controlled, so this is a note, not a bug.
+
+**2.3 `AmbiguousCurrencyException` / `defaultCurrency` design — coherent, endorsed.** `AmbiguousCurrencyException` is a genuinely good addition: refusing to print "EUROS" for an `es-MX` amount is exactly the class of silent wrongness this PR exists to eliminate, and the error message names the fix. Deferring the throw to `Convert()` rather than the constructor is correct, because `ConvertWithoutCurrency("es-MX")` must keep working. `ScaleKind` is likewise a real grammatical concept (not a per-language flag), earns its place in both French and Spanish, and defaults sanely. These are coherent model additions, not bolt-ons.
+
+Minor: `ResolveCurrency()` re-runs a 4-branch resolution on every `Convert()` call even though the converter is immutable and the answer is fixed at construction. Cosmetic given the cost, but it does mean the exception's *cause* (constructor arguments) is reported at a *distant* site.
+
+**2.4 README states a workaround that does not exist.** `README.md` L213: *"Currency names distinguish only 'one' from 'not one'. Languages with dual or paucal forms need a custom localization."* A custom `LocalizationModel` **cannot** fix this — `Inflect` (L307) is hardcoded C# and `CurrencyModel` has exactly two slots. My Russian probe confirms it. The limitation statement is right; the offered escape hatch is not. Either drop the second sentence or say plainly that these languages are not supported.
+
+**2.5 French `d'euros`.** 14 lines of `fr-FR.approved.txt` contain "UN MILLION EUROS" / "DEUX CENTS MILLIONS EUROS", which is not correct French. `README.md` L211 documents this honestly, and the reasoning (elision depends on the following word; `NounScaleLinkWord` is a fixed string, and fr-FR defines EUR/USD/CHF which elide differently) is sound. I am **not** calling this a blocker given the documentation — but note it is the same missing concept as §0: a context-sensitive form selector. When you add the plural-category mechanism, French elision falls out of it for free.
+
+**2.6 CI does not test net6.0 or net7.0.** `ci.yml` installs all four SDKs and builds all five target frameworks, but the test project targets net9.0/net8.0/net48. The net48 leg does exercise the `netstandard2.0` build, which is the important one. Still, two shipped TFMs are compiled but never run. One line in the test csproj.
+
+---
+
+## 3. Test suite assessment
+
+**Verdict: healthy, and the strongest part of this PR.** 277 tests, 1748 lines, organized coherently by concern (locale, feature, cross-cutting). `ThreadSafetyTests` with 20,000 parallel iterations against a shared converter is exactly the right test for the bug it guards. `ReadmeSchemaTests` — parsing the JSON block *out of README.md itself* and running it through the full validator — is genuinely excellent; it catches a misspelled key in documentation, which almost no library tests for.
+
+**The golden snapshot approach pulls its weight.** 4 × 1058 lines, covering 0–1000 plus a magnitude ladder plus fractions, per locale. This is the right tool: it is what catches the "the hand-written table stopped at two million" class of bug, and a regression surfaces as a reviewable diff rather than silence. `AssertSameLines` reporting the first mismatching line (rather than a 40KB string diff) is a thoughtful touch. The `NUMWORDIFY_APPROVE=1` re-approval flow is standard and correctly documented. Maintenance drag is low because the inputs are a fixed list, not generated.
+
+**One real gap.** The four newest grammar settings have **no test that exercises them in isolation**:
+
+```
+scaleKinds                   *** NONE ***
+NounScaleLinkWord            *** NONE ***
+ApocopateBeforeNoun          *** NONE ***
+UseExactHundredsBeforeScale  *** NONE ***
+```
+
+They are covered only *indirectly*, through the two shipped locales that happen to set them — and always in the same combination. `TestLocalizations.cs` is a fixed English builder that cannot toggle any of them. These four settings interact combinatorially (see §1.5), so the untested combinations are precisely the ones a fifth language will hit first. Add a synthetic-locale theory that toggles each flag independently and asserts the documented behavior. This matters more than any refactor in §1.
+
+**Acceptable duplication.** 88–96% of the hand-written per-locale `InlineData` cases are already covered by the golden snapshots (English 20/22, French 45/47, Spanish 28/30, Turkish 30/34). Normally I would push back on ~130 duplicated assertions — but here the hand-written tables carry the *intent* (each has an explanatory name and comment), while the snapshot carries the *coverage*. That is a defensible split. Leave it.
+
+---
+
+## 4. API surface, docs, exceptions
+
+**Exception hierarchy: well designed.** A single `NumWordifyException` base with four sealed leaves, each carrying structured data alongside the message (`LocalizationNotFoundException.AvailableCultures`, `NumberOutOfRangeException.MaximumScaleCount`, `AmbiguousCurrencyException.RequestedCulture`/`ResolvedCulture`). Messages state the problem *and* the fix. `Exceptions/NumWordifyException.cs` at 136 lines for 5 types is appropriately compact — I would not split it.
+
+One inconsistency: currency-code lookup failure throws `ArgumentException` (`NumberToWordsConverter.cs` L579) while every other library-level failure throws a `NumWordifyException` subtype. Arguable either way — it *is* a bad argument — but a caller writing `catch (NumWordifyException)` will miss it. Worth a deliberate decision, documented.
+
+**XML docs: excellent, and unusually so.** 655 doc lines across the library. Critically, they explain *why*, with concrete examples (`"UN MILLÓN DE EUROS", but "UN MILLÓN QUINIENTOS MIL EUROS"` on `NounScaleLinkWord`; the French adjective/noun split on `ScaleKind`). The inline comments are the same quality — L232–234, L271, L388, L406–407, L444–445, L537 each explain a decision that would otherwise look arbitrary. This is a real asset and should not be trimmed.
+
+**File sizes: all fine.** Largest library file is 585 lines (342 code). Nothing approaches 1k. Applying §1 would bring the converter to roughly 500 lines.
+
+**Build/release infrastructure: solid.** `Directory.Build.props` with pinned `AnalysisLevel` and `TreatWarningsAsErrors` (with the reasoning for pinning spelled out); `publish.yml` deriving the version from the tag, rejecting SemVer build metadata that NuGet would strip, verifying the produced filename, and deliberately omitting `--skip-duplicate`. The `environment: nuget` gate is the right call. No findings.
+
+---
+
+## VERDICT: **SHIP 2.0.0 AS IS**
+
+Not a rubber stamp — ship *after* the §1 cleanups, which total roughly 60 lines of deletion and half a day of work, plus the §3 test gap:
+
+| | |
+|---|---|
+| 1.1 | Delete the two `[Obsolete]` settings properties (free, verified) |
+| 1.2 | Collapse `Currency` + `DefaultCurrency` into one representation |
+| 1.3 | Add `NumberToWordsConverter(WordifyOptions)`; delete `CreateConverter` |
+| 1.4 | Cache `_numbers` / `_settings`; delete 6 `null!` suppressions |
+| 1.5 | Replace three ad-hoc "what follows" booleans with one `Following` enum |
+| 3 | Add a synthetic-locale test that toggles the four grammar flags in isolation |
+
+1.1 through 1.3 are breaking changes and this is the last free window for them. 1.4 and 1.5 are pure internal cleanup and could follow.
+
+**Do not build the rule engine.** The measured code does not justify it (200 lines of algorithm, max nesting 4, no method over 51 lines), the rule-chain pattern the reviewers wanted already exists in `TensAndOnesWord`, the real gap is schema expressiveness which a rule engine would not close, and a JSON-driven engine would destroy the validator's "cannot fail later" guarantee — the single best thing about this PR. When language five needs it, add a **plural-category selector** and **per-scale override maps**: two data-model extensions of roughly 60 lines that *delete* `ScalesPlural`, `MajorSingular` and `MinorSingular` as special cases, and hand you French elision for free.
+
+### The strongest argument against my own verdict
+
+The live behavior-flag count went from 3 to 7 while shipped languages went from 2 to 4 — and **two of the four new flags exist to serve exactly one language each** (`UseExactHundredsBeforeScale` is set only by fr-FR; `NounScaleLinkWord` only by es-ES). If that ratio holds, language eight arrives with roughly 15 boolean flags whose pairwise interactions nobody has tested — and today **not one of those four flags has a test that exercises it in isolation** (§3). That is precisely the failure mode of a flag-per-quirk architecture, and the earlier reviewers were pattern-matching on a real trend even though their diagnosis of the *current* state was wrong.
+
+My counter is that these flags are named after grammatical concepts, not languages, and will be reused across families — Italian, Portuguese and Catalan will all want `ApocopateBeforeNoun`. But that is a prediction, not a measurement. **The way to test it is to add language five before 2.1 and count how many new flags it costs.** If the answer is two or more, the architecture question is genuinely open again, and I would want it settled before the flag count reaches double digits. Fix the §3 test gap now so that experiment is cheap to run.</result>
+<usage><subagent_tokens>146608</subagent_tokens><tool_uses>26</tool_uses><duration_ms>637080</duration_ms></usage>
+</task-notification>
+
+---
+
+<task-notification>
+<task-id>a450cdc5e2986c74e</task-id>
+<tool-use-id>toolu_011mGd22SUK95GHKHBNDmkJn</tool-use-id>
+<output-file>C:\Users\empad\AppData\Local\Temp\claude\C--Users-empad-Desktop-Development-entire-numwordify\806ff40c-d20c-4f2d-940c-ba9eede27e70\tasks\a450cdc5e2986c74e.output</output-file>
+<status>completed</status>
+<summary>Agent "Thermo bug/security review" finished</summary>
+<note>A task-notification fires each time this agent stops with no live background children of its own. The user can send it another message and resume it, so the same task-id may notify more than once.</note>
+<result>I completed a full independent audit of `fix/v2-correctness-overhaul` (4 commits, 51 files) — reading every changed source file, building all 5 target frameworks, running the 277-test suite (all pass on net9.0/net8.0/net48), and cross-checking the conversion engine against an independently written reference implementation over ~508,000 values.
+
+## Bottom line
+
+**The conversion core is clean.** None of the six priority-focus areas contains a correctness defect. I found one High-severity issue, and it is not in the converter — it is that the documented mitigation for this release's headline breaking change does not work, and the test that was written to prove it works cannot fail.
+
+---
+
+## CONFIRMED — High
+
+### 1. The README's documented `CurrentCulture` guard does not work; `IsCultureSupported` is a misleading guard; the test asserting it is vacuous
+
+- `README.md` §"Checking a culture before using it" (~line 113)
+- `Converters/NumberToWordsConverter.cs:57,64` (`IsCultureSupported`), `:235-236` (throw site)
+- `tests/NumWordify.Tests/ReadmeExampleTests.cs:90-98`
+
+The README presents this as *the* safe way to use the machine culture:
+
+```csharp
+var culture = NumberToWordsConverter.IsCultureSupported(CultureInfo.CurrentCulture)
+    ? CultureInfo.CurrentCulture.Name : "en-US";
+amount.ToWords(culture);
+```
+
+`IsCultureSupported` answers "does a localization resolve?", but `Convert` additionally requires `RegionMatches`. The two questions differ for every culture that resolves by language fallback, so the guard passes and the very next line throws.
+
+Reproduced (probe against `bin/Release/net9.0/NumWordify.dll`), running the recipe verbatim per machine culture:
+
+```
+machine=en-US  guarded-&gt;en-US  OK
+machine=en-GB  guarded-&gt;en-GB  THROWS AmbiguousCurrencyException
+machine=en-CA/AU/IN/NZ/IE/ZA   THROWS AmbiguousCurrencyException
+machine=es-MX/AR/CO/CL         THROWS AmbiguousCurrencyException
+machine=fr-CA/BE/CH            THROWS AmbiguousCurrencyException
+machine=tr-CY                  THROWS AmbiguousCurrencyException
+machine=de-DE  guarded-&gt;en-US  OK   (unsupported -&gt; correctly falls back)
+```
+
+Enumerating every installed .NET culture: **`IsCultureSupported` returns `true` for 187 cultures; `ToWords` throws for 178 of them.** Only the 4 shipped specifics, the 4 neutrals, and `tr-TR-EUR` actually work.
+
+`ReadmeExampleTests.Culture_fallback_example` runs that exact snippet but only asserts `Assert.False(string.IsNullOrWhiteSpace(...))` on whatever the **ambient** culture produces. Nothing in the repo pins `CurrentCulture` (grep confirms line 93 is the only occurrence in tests, and no `DOTNET_SYSTEM_GLOBALIZATION*` env var in the workflows). On `ubuntu-latest` the culture is invariant → falls to `en-US`; on `windows-latest` it is `en-US`; on the maintainer's machine it is `tr-TR`. The test can never fail in any environment this project runs in, which is why a broken recipe shipped with a green suite.
+
+The throw itself is intentional and well documented — I am **not** reporting that. What the author appears unaware of is that (a) the recommended workaround is broken, (b) there is no public API that answers "will `Convert` succeed?", and (c) `README.md` §Basic usage says *"`"EN-US"`, `"en"` and `"en-GB"` all resolve to `en-US`"* immediately under `ToWords` examples, which reads as if `1234.56M.ToWords("en-GB")` works. It throws.
+
+Suggested fixes: make the test culture-parameterised over `en-GB`/`es-MX` (it will fail today), change the README recipe to `ToWordsWithoutCurrency` or an explicit currency code, and consider an API such as `IsCultureSupported(culture, out bool currencyApplies)` or `TryGetDefaultCurrency`.
+
+---
+
+## CONFIRMED — Low / Medium (developer experience)
+
+### 2. `global.json` hard-pins the .NET 9 SDK band; .NET 9 is out of support as of May 2026
+`global.json:1-6` — `"version": "9.0.100", "rollForward": "latestFeature"`. I verified empirically that `latestFeature` never crosses major.minor: a scratch `global.json` asking for `8.0.100/latestFeature` resolved to `8.0.424` (**not** the installed 9.0.314), and `11.0.100/latestFeature` fails with `A compatible .NET SDK was not found`. A contributor with only the .NET 10 SDK installed therefore cannot run `dotnet build`/`dotnet restore` at all. There was no `global.json` on `master`, so this is new. The README's Contributing section does not mention it. Note the stated justification ("a new SDK band cannot turn a release build red") is already served by `AnalysisLevel 9.0` in `Directory.Build.props`; `rollForward: latestMinor` would keep the analyzer pin while unblocking newer SDKs.
+
+### 3. Test project targets `net48` on Windows with no reference-assembly package
+`tests/NumWordify.Tests/NumWordify.Tests.csproj:8` adds `net48` on Windows, but there is no `PackageReference` to `Microsoft.NETFramework.ReferenceAssemblies`. It builds here and on `windows-latest` only because the 4.x targeting packs are machine-installed (VS / Build Tools). A Windows contributor with only the .NET SDK will hit `MSB3644: The reference assemblies for .NET Framework v4.8 were not found`. One `PackageReference` fixes it.
+
+### 4. The process-wide cached culture array is handed out mutably
+`Converters/LocalizationLoader.cs:68-78`, `NumberToWordsConverter.cs:44`, `Exceptions/NumWordifyException.cs` (`LocalizationNotFoundException.AvailableCultures`). Reproduced:
+
+```
+runtime type of SupportedCultures: System.String[]
+before: en-US, es-ES, fr-FR, tr-TR
+after mutating through a cast: PWNED, es-ES, fr-FR, tr-TR
+exception message now: ... Available cultures: PWNED, es-ES, fr-FR, tr-TR.
+ex.AvailableCultures same instance as SupportedCultures: True
+```
+
+`IReadOnlyList&lt;string&gt;` over a `string[]` is castable and mutable, and the corruption is permanent for the process. Not a trust-boundary crossing, but it contradicts the loader's own doc comment ("The cached instances are never handed out to callers, which is what makes sharing them safe"). Wrap in `ReadOnlyCollection&lt;string&gt;` or hand out a copy.
+
+### 5. Validator does not cross-check `decimalPlaces` against `scales.Length`
+`Converters/LocalizationValidator.cs:58-62` vs `NumberToWordsConverter.cs:277,338`. The fraction is rendered through `ConvertWholeNumber`, so `decimalPlaces &gt; 3` needs a thousands scale word. A locale with `scales: [""]` and `decimalPlaces: 6` passes validation, then `Convert(1.123456m)` throws at runtime with a message that blames the wrong thing:
+
+```
+NumberOutOfRangeException: The number 1,123456 is too large for this locale:
+it defines 1 scale word(s), so the largest convertible value is 10^3 - 1.
+```
+
+The whole part is `1`. Also note `1,123456` — `NumberOutOfRangeException`'s interpolated `{value}` uses `CurrentCulture` (`Exceptions/NumWordifyException.cs`); every other number→string in the output path correctly uses `InvariantCulture`. No shipped locale is affected; this only bites custom localizations.
+
+### 6. Latent: a mixed-case resource filename would break `SupportedCultures`
+`Converters/LocalizationLoader.cs:58-63,117-121`. `ResourceNames` filters with `EndsWith(".json", OrdinalIgnoreCase)`, but `Load` rebuilds the key as `CultureNameOf(name) + ".json"` (lowercase, ordinal) and `GetManifestResourceStream` is case-sensitive. A future `Resources/de-DE.JSON` would make `SupportedCultures` throw `InvalidLocalizationException` for every caller. All five shipped files are lowercase, so this is latent only.
+
+---
+
+## Pre-existing, out of scope — noted for context only
+
+`ConvertWithoutCurrency` in the default `Fraction` reading mode loses the fraction's leading zeros: `0.05m` → `"ZERO POINT FIVE"`, `1.01m` → `"ONE POINT ONE"` (vs `0.5m` → `"ZERO POINT FIFTY"`). I confirmed against `git show master:Converters/NumberToWordsConverter.cs` that master behaves identically, so this branch did not introduce it — and it is explicitly documented in README §Precision and rounding with `decimalReading: "Digits"` offered as the fix. Mentioning only because the golden snapshots now bless it as expected output for all four locales.
+
+---
+
+## Verified clean (the priority-focus list)
+
+I actively tried to break each of these and could not:
+
+1. **`ScaleKind` / `scaleKinds`** — `LocalizationValidator.cs:90-95` enforces exact parallelism with `scales`, and `KindOf` (`NumberToWordsConverter.cs:310-313`) independently bounds-checks, so the null/short cases are both closed. All three call sites (`:341`, `:407`, `:446`) produce correct output for es-ES and fr-FR (which declare `scaleKinds`) and for tr-TR/en-US (which do not, and correctly default to `Adjective`). Confirmed by the fuzz below, including the exact cases the enum exists for: `DEUX CENT MILLE` vs `DEUX CENTS MILLIONS`, `QUATRE-VINGT MILLE` vs `QUATRE-VINGTS MILLIONS`, `UN MILLÓN DE EUROS` vs `UN MILLÓN QUINIENTOS MIL EUROS`, `VEINTIÚN MILLONES` vs `VEINTIUNO`.
+2. **`AmbiguousCurrencyException` condition** — the `RegionMatches` logic in `TryResolveResourceName` (`LocalizationLoader.cs:132-188`) is correct: exact match → true, same-region language match → true, no region requested → true, different region → false. It cannot stay silent when the resolved currency is genuinely wrong. It does fire for `fr-BE`/`tr-CY`, where the currency happens to agree — a deliberate conservative choice, correctly ordered after `_overriddenCurrency`. The defect is the ecosystem around it (finding 1), not the condition.
+3. **`defaultCurrency`** — mutual exclusion with legacy `currency` is enforced (`LocalizationValidator.cs:171-176`), the key is validated against `currencies` case-insensitively, and a custom model setting neither gives a clear, actionable `InvalidLocalizationException` from `Convert` while `ConvertWithoutCurrency` still works. All 5 resource files migrated consistently.
+4. **Deprecated/legacy locale resolution** — `tr` correctly skips deprecated `tr-TR-EUR` and lands on `tr-TR`; `tr-TR-EUR` still resolves by exact name (case-insensitively, incl. `TR-tr-eur`); `SupportedCultures` excludes it. No re-entrancy or deadlock between the two `Lazy&lt;T&gt;` instances and the `ConcurrentDictionary`. The cache is keyed on the canonical manifest name and is bounded by the manifest, so caller-controlled culture strings cannot grow it — no memory-exhaustion vector.
+5. **Placeholder whitespace** — zero double-spaces, zero untrimmed edges across the full fuzz, plus targeted probes for empty `{major}`/`{minor}`, a currency name containing `{minor}` (emitted literally, single-pass), and a custom `compoundSeparator`. The captured-leading-space trick works as designed.
+6. **Golden snapshots** — genuinely assert against the committed `Approvals/*.txt`; `NUMWORDIFY_APPROVE` is not set in either workflow, a missing file fails with an explicit message, and `AssertSameLines` compares line-by-line then asserts equal lengths. Not vacuous. (The vacuous test is `ReadmeExampleTests.Culture_fallback_example`, finding 1.)
+
+**Cross-check evidence:** I wrote independent reference implementations of English, Turkish, French and Spanish number-words from the language rules (not from the library's code) and compared against the built DLL over 508,040 values — 0–100,000 exhaustively, 400,000 random values up to 10^15−1, and ±1005 dense windows around every scale boundary (10^3/10^6/10^9/10^12) — for both `Convert` and `ConvertWithoutCurrency`:
+
+```
+--- en: 0 mismatches   --- tr: 0 mismatches   --- fr: 0 mismatches
+--- es: 0 mismatches   --- whitespace anomalies: 0
+checked 508040 values
+```
+
+Also verified clean: rounding/carry/negative-zero at the decimal extremes (`decimal.MaxValue`/`MinValue` fail as typed `NumberOutOfRangeException`; `whole += 1` cannot overflow); `Extensions/DecimalExtensions.cs` and `WordifyOptions` argument handling; `dotnet list package --vulnerable --include-transitive` reports none (`System.Text.Json 8.0.5` is past CVE-2024-43485); `Resources/*.json` are loaded only from the assembly manifest with no caller-controlled path, so no traversal; both regexes are backtracking-safe; `ci.yml` uses `pull_request` (not `pull_request_target`) with `contents: read` and no secrets, and `publish.yml` gates the NuGet key behind an `environment` with tag-format and version-verification checks. The `es-ES` range reduction to 10^15−1 is deliberate and documented in CHANGELOG, README §Range and §Known limitations.
+
+No repository files were modified; all probe code lives in the session scratchpad.</result>
+<usage><subagent_tokens>269310</subagent_tokens><tool_uses>47</tool_uses><duration_ms>1241910</duration_ms></usage>
+</task-notification>
+
+---
+
+Evet hepsini ele al
