@@ -150,6 +150,11 @@ bug fixes. See "Migrating from 1.x" in the README before upgrading.
 - The package version comes from the release tag. It was hardcoded to `1.0.0`, so every
   tag produced the same package and `--skip-duplicate` swallowed the push while the job
   reported success. `--skip-duplicate` has been removed.
+- Publishing authenticates through NuGet Trusted Publishing (OIDC) instead of a stored
+  API key. The workflow exchanges a signed, short-lived GitHub token for a key that lives
+  one hour, so the repository holds no long-lived publishing credential. nuget.org is
+  cutting new API keys to 30 days from 2026-08-17 and expiring every existing key on
+  2026-11-01, which would otherwise have made this release a recurring chore.
 - `System.Text.Json` is referenced only for the `netstandard2.0` target; the other targets
   have it in the box.
 - `favicon.ico` is no longer packed into consuming projects, and the package icon dropped

@@ -11,9 +11,17 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # Requires an environment named "nuget" holding NUGET_API_KEY, so publishing can be
-    # gated on a reviewer rather than on whoever can push a tag.
+    # Requires an environment named "nuget", so publishing can be gated on a reviewer
+    # rather than on whoever can push a tag. The trusted publishing policy on nuget.org
+    # names this environment too, so a run outside it cannot obtain a key.
     environment: nuget
+
+    permissions:
+      contents: read
+      # Lets the job request a signed OIDC token from GitHub. This is what replaces the
+      # stored API key: nuget.org validates the token against a trusted publishing policy
+      # and hands back a key that lives one hour.
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -71,11 +79,18 @@ jobs:
             exit 1
           fi
 
+      # Trusted Publishing. Requested here rather than earlier in the job because the key
+      # nuget.org issues is valid for one hour, and a token can be exchanged exactly once.
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: login
+        with:
+          # The nuget.org profile name that owns the package — not an email address.
+          user: keparlak
+
       # No --skip-duplicate: re-publishing an existing version is a mistake worth failing on.
       - name: Push to NuGet
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
           dotnet nuget push "out/NumWordify.${PKG_VERSION}.nupkg" \
-            --api-key "$NUGET_API_KEY" \
+            --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
             --source https://api.nuget.org/v3/index.json
