@@ -410,6 +410,8 @@ tests/
 
 Contributions are welcome. A pull request that changes conversion output must come with the regenerated snapshot, and the diff has to be readable line by line.
 
+Building needs the .NET 9 SDK or newer — `global.json` sets 9.0.100 as the floor and rolls forward to the newest installed major, so a newer SDK needs no edit. Running the full test suite additionally needs the .NET 8 runtime, and on Windows the .NET Framework 4.8 targeting pack, because the suite runs against net9.0, net8.0 and net48. Which analyzer warnings fire is pinned by `AnalysisLevel` in `Directory.Build.props`, not by the SDK you happen to have.
+
 - Add support for new languages
 - Improve existing language support
 - Fix bugs
