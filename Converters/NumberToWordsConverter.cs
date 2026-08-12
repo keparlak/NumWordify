@@ -65,6 +65,39 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
         cultureInfo is not null && LocalizationLoader.IsSupported(cultureInfo.Name);
 
     /// <summary>
+    /// Determines whether the library can convert numbers for the given culture, and
+    /// whether <see cref="Convert(decimal)"/> can name a currency for it.
+    /// </summary>
+    /// <param name="culture">The culture code to test, for example <c>"en-US"</c>.</param>
+    /// <param name="currencyApplies">When this method returns, contains
+    /// <see langword="true"/> when the resolved locale's default currency applies to the
+    /// requested culture. When <see langword="false"/>, <see cref="Convert(decimal)"/>
+    /// throws unless a currency is supplied to the constructor;
+    /// <see cref="ConvertWithoutCurrency(decimal)"/> works either way.</param>
+    /// <returns><see langword="true"/> when a localization resolves for the culture.</returns>
+    /// <remarks>
+    /// This is the overload to use before handing over
+    /// <see cref="CultureInfo.CurrentCulture"/>. Resolving is not the same question as
+    /// converting with currency: <c>en-GB</c> resolves to the English number words, but
+    /// their default currency is the US dollar, so it is not the right one for a British
+    /// amount and the library refuses to guess.
+    /// </remarks>
+    public static bool IsCultureSupported(string? culture, out bool currencyApplies) =>
+        LocalizationLoader.IsSupported(culture, out currencyApplies);
+
+    /// <summary>
+    /// Determines whether the library can convert numbers for the given culture, and
+    /// whether <see cref="Convert(decimal)"/> can name a currency for it.
+    /// </summary>
+    /// <param name="cultureInfo">The culture to test.</param>
+    /// <param name="currencyApplies">When this method returns, contains
+    /// <see langword="true"/> when the resolved locale's default currency applies to the
+    /// requested culture.</param>
+    /// <returns><see langword="true"/> when a localization resolves for the culture.</returns>
+    public static bool IsCultureSupported(CultureInfo? cultureInfo, out bool currencyApplies) =>
+        LocalizationLoader.IsSupported(cultureInfo?.Name, out currencyApplies);
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class for a culture.
     /// </summary>
     /// <param name="culture">The culture code, for example <c>"en-US"</c>. Matching is
@@ -74,11 +107,19 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
     /// <exception cref="LocalizationNotFoundException">No localization matches the culture.</exception>
     /// <exception cref="InvalidLocalizationException">The localization resource is invalid.</exception>
     public NumberToWordsConverter(string culture)
+        : this(LocalizationLoader.Resolve(culture), culture)
     {
-        var resolved = LocalizationLoader.Resolve(culture);
+    }
 
+    /// <summary>
+    /// The one place the four resolution fields are written. Every public constructor
+    /// reaches the same state through here, so there is a single answer to "which
+    /// localization, matched how closely, for which requested culture".
+    /// </summary>
+    private NumberToWordsConverter(ResolvedLocalization resolved, string requestedCulture)
+    {
         _localization = resolved.Model;
-        _requestedCulture = culture;
+        _requestedCulture = requestedCulture;
         _resolvedCulture = resolved.CultureName;
         _localeCurrencyApplies = resolved.RegionMatches;
     }
@@ -159,16 +200,21 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
     /// <exception cref="ArgumentNullException"><paramref name="localization"/> is <see langword="null"/>.</exception>
     /// <exception cref="InvalidLocalizationException">The localization is incomplete or inconsistent.</exception>
     public NumberToWordsConverter(LocalizationModel localization)
+        : this(ValidatedCustom(localization), CustomLocalizationSource)
+    {
+    }
+
+    /// <summary>
+    /// Wraps a caller-supplied model as a resolution result. A model handed over directly
+    /// was not matched to anything, so its currency always applies.
+    /// </summary>
+    private static ResolvedLocalization ValidatedCustom(LocalizationModel localization)
     {
         if (localization is null)
             throw new ArgumentNullException(nameof(localization));
 
         LocalizationValidator.Validate(localization, CustomLocalizationSource);
-
-        _localization = localization;
-        _requestedCulture = CustomLocalizationSource;
-        _resolvedCulture = CustomLocalizationSource;
-        _localeCurrencyApplies = true;
+        return new ResolvedLocalization(localization, CustomLocalizationSource, regionMatches: true);
     }
 
     /// <summary>
@@ -197,6 +243,42 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
     {
         _overriddenCurrency = ResolveCurrencyCode(_localization, CustomLocalizationSource, currencyCode);
     }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="NumberToWordsConverter"/> class from a
+    /// set of options, which is the only overload that covers every combination at once.
+    /// </summary>
+    /// <param name="options">Culture, localization and currency settings. Nothing is
+    /// retained from the instance itself, so it can be reused or mutated afterwards.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
+    /// <exception cref="LocalizationNotFoundException">No localization matches the culture.</exception>
+    /// <exception cref="InvalidLocalizationException">The localization or currency is incomplete.</exception>
+    /// <exception cref="ArgumentException">The locale does not define
+    /// <see cref="WordifyOptions.CurrencyCode"/>.</exception>
+    public NumberToWordsConverter(WordifyOptions options)
+        : this(ResolveOptions(options), RequestedCultureOf(options))
+    {
+        // Honouring Currency but silently dropping CurrencyCode would make the same
+        // mistake an error on one path and invisible on the other.
+        _overriddenCurrency =
+            options.Currency is { } currency ? ValidatedOverride(currency)
+            : options.CurrencyCode is { } currencyCode
+                ? ResolveCurrencyCode(_localization, _resolvedCulture, currencyCode)
+                : null;
+    }
+
+    private static ResolvedLocalization ResolveOptions(WordifyOptions options)
+    {
+        if (options is null)
+            throw new ArgumentNullException(nameof(options));
+
+        return options.Localization is { } localization
+            ? ValidatedCustom(localization)
+            : LocalizationLoader.Resolve(options.Culture);
+    }
+
+    private static string RequestedCultureOf(WordifyOptions options) =>
+        options.Localization is null ? options.Culture : CustomLocalizationSource;
 
     /// <summary>
     /// Converts a number to words including its currency units.
@@ -235,15 +317,13 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
         if (!_localeCurrencyApplies)
             throw new AmbiguousCurrencyException(_requestedCulture, _resolvedCulture);
 
-        if (_localization.Currency is { } declared)
-            return declared;
-
         if (_localization.DefaultCurrency is { } key)
             return ResolveCurrencyCode(_localization, _resolvedCulture, key);
 
         throw new InvalidLocalizationException(
-            "This localization defines no currency. Supply a CurrencyModel to the constructor " +
-            "or call ConvertWithoutCurrency instead.");
+            "This localization defines no currency. Set 'defaultCurrency' to one of the entries in " +
+            "'currencies', supply a CurrencyModel to the constructor, or call " +
+            "ConvertWithoutCurrency instead.");
     }
 
     private static CurrencyModel ValidatedOverride(CurrencyModel currency)

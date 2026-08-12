@@ -130,7 +130,7 @@ public static class DecimalExtensions
     /// <returns>The number in words, with currency.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
     public static string ToWords(this decimal number, WordifyOptions options) =>
-        CreateConverter(options).Convert(number);
+        new NumberToWordsConverter(options).Convert(number);
 
     /// <summary>
     /// Converts a number to words without currency, using the given options.
@@ -140,31 +140,5 @@ public static class DecimalExtensions
     /// <returns>The number in words, without currency.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="options"/> is <see langword="null"/>.</exception>
     public static string ToWordsWithoutCurrency(this decimal number, WordifyOptions options) =>
-        CreateConverter(options).ConvertWithoutCurrency(number);
-
-    private static NumberToWordsConverter CreateConverter(WordifyOptions options)
-    {
-        if (options is null)
-            throw new ArgumentNullException(nameof(options));
-
-        if (options.Localization is { } localization)
-        {
-            if (options.Currency is { } modelCurrency)
-                return new NumberToWordsConverter(localization, modelCurrency);
-
-            // Honouring Currency but silently dropping CurrencyCode would make the same
-            // mistake an error on one path and invisible on the other.
-            return options.CurrencyCode is { } modelCurrencyCode
-                ? new NumberToWordsConverter(localization, modelCurrencyCode)
-                : new NumberToWordsConverter(localization);
-        }
-
-        if (options.Currency is { } currency)
-            return new NumberToWordsConverter(options.Culture, currency);
-
-        if (options.CurrencyCode is { } currencyCode)
-            return new NumberToWordsConverter(options.Culture, currencyCode);
-
-        return new NumberToWordsConverter(options.Culture);
-    }
+        new NumberToWordsConverter(options).ConvertWithoutCurrency(number);
 }

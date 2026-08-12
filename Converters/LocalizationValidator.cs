@@ -166,18 +166,6 @@ internal static class LocalizationValidator
             }
         }
 
-        // Naming the default currency twice is how the two copies drift apart, so the
-        // model accepts one or the other, never both.
-        if (localization.Currency is not null && localization.DefaultCurrency is not null)
-        {
-            throw Invalid(source,
-                "'currency' and 'defaultCurrency' are both set. Use 'defaultCurrency' to point at an " +
-                "entry in 'currencies', or 'currency' to spell one out, but not both.");
-        }
-
-        if (localization.Currency is { } declared)
-            ValidateCurrency(declared, "currency", source);
-
         if (localization.DefaultCurrency is { } key)
         {
             if (localization.Currencies is null ||

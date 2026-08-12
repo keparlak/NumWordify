@@ -113,17 +113,27 @@ A culture that names no region at all (`"es"`) is not contradicting the locale, 
 
 ### Checking a culture before using it
 
-`CultureInfo.CurrentCulture` is whatever the machine is set to, and only four languages ship with the library:
+`CultureInfo.CurrentCulture` is whatever the machine is set to, and only four languages ship with the library. Resolving and naming a currency are two separate questions, so the guard answers both — `en-GB` resolves to the English number words, but their default currency is the US dollar, and the library will not print `DOLLARS` for a British amount:
 
 ```csharp
-var culture = NumberToWordsConverter.IsCultureSupported(CultureInfo.CurrentCulture)
-    ? CultureInfo.CurrentCulture.Name
+var machine = CultureInfo.CurrentCulture;
+
+var culture = NumberToWordsConverter.IsCultureSupported(machine, out var currencyApplies) && currencyApplies
+    ? machine.Name
     : "en-US";
 
 amount.ToWords(culture);
 
 NumberToWordsConverter.SupportedCultures;
 // ["en-US", "es-ES", "fr-FR", "tr-TR"]
+```
+
+The single-argument `IsCultureSupported(culture)` answers only "do the number words resolve?", which is the right question for `ToWordsWithoutCurrency` and for supplying your own currency:
+
+```csharp
+1M.ToWordsWithoutCurrency("en-GB");     // "ONE POINT ZERO"
+1M.ToWords("en-GB", "GBP");             // "ONE POUND ZERO PENCE"
+1M.ToWords("en-GB");                    // throws AmbiguousCurrencyException
 ```
 
 ### Negative numbers and zero
@@ -210,7 +220,7 @@ Argument mistakes (`null` culture, `null` model, unknown currency code, empty cu
 
 - **French** does not insert `de` / `d'` between a noun scale word and a currency name: `1_000_000M.ToWords("fr-FR")` yields "UN MILLION EUROS" where correct French is "un million d'euros". The elision depends on the following word, which the template model cannot express. Supply your own `currencyFormat`, or post-process, if you need it. Spanish, where no elision occurs, is handled: "UN MILLÓN DE EUROS".
 - **Spanish** stops at 10^15 − 1. `MILLARDO` (10^9) is accepted by the RAE but uncommon — "mil millones" is the usual form and cannot be expressed as a single scale word here. 10^15 has no accepted single word at all, so the scale is not defined rather than invented. Gender agreement (`DOSCIENTAS`) is not modelled.
-- **Currency names** distinguish only "one" from "not one". Languages with dual or paucal forms need a custom localization.
+- **Currency names** distinguish only "one" from "not one", and the choice is made in code rather than in the locale file. Languages whose plural rules need more categories — Russian and Polish (`one`/`few`/`many`, selected on `n % 10` and `n % 100`), Arabic (which adds a dual) — cannot be expressed here, and no custom localization works around it. The same missing concept is what blocks French elision above.
 - **Word order within a group** is fixed as hundreds → tens → ones. Languages that invert it, such as German "einundzwanzig", cannot be expressed without enumerating 21–99 in `specialNumbers.special`.
 - **Ordinals** ("twenty-first") are out of scope.
 
@@ -224,7 +234,11 @@ using NumWordify.Models;
 
 var japanese = new LocalizationModel
 {
-    Currency = new CurrencyModel { Major = "YEN", Minor = "SEN" },
+    Currencies = new Dictionary<string, CurrencyModel>
+    {
+        ["JPY"] = new() { Major = "YEN", Minor = "SEN" },
+    },
+    DefaultCurrency = "JPY",
     Numbers = new NumbersModel
     {
         Ones = ["", "ICHI", "NI", "SAN", "YON", "GO", "ROKU", "NANA", "HACHI", "KYU"],
@@ -344,8 +358,7 @@ Top level
 | Field | Meaning |
 | --- | --- |
 | `currencies` | Currencies this locale can name, keyed by ISO 4217 code. |
-| `defaultCurrency` | Key into `currencies` naming the default. Mutually exclusive with `currency`. |
-| `currency` | The default currency spelled out. Prefer `defaultCurrency` when the currency is already in the map; naming it twice is how the two copies drift apart. |
+| `defaultCurrency` | Key into `currencies` naming the one `Convert` uses when nothing overrides it. A locale that names a single currency still lists it here. |
 | `deprecated` | Excludes the locale from `SupportedCultures` and from language fallback. It still resolves when named exactly. |
 
 Templates are expanded in a single pass, so a currency name that happens to contain `{minor}` is emitted literally rather than being treated as another placeholder. A placeholder that resolves to an empty string takes its preceding space with it; whitespace a locale wrote on purpose is left alone.
@@ -363,9 +376,10 @@ Version 2.0 changes output for four of the five shipped locales, because that ou
 - **Exceptions** moved to the `NumWordify.Exceptions` namespace. `FileNotFoundException` became `LocalizationNotFoundException` and most `InvalidOperationException` cases became `InvalidLocalizationException`; both derive from `NumWordifyException` and neither derives from the old types, so 1.x `catch` blocks stop matching.
 - **A culture that resolves through language fallback no longer borrows the locale's default currency** — `ToWords("es-MX")` now throws `AmbiguousCurrencyException` instead of silently printing euros.
 - **`tr-TR-EUR` is no longer listed in `SupportedCultures`** and is never chosen by fallback, though naming it exactly still works.
-- **`settings.useCompoundNumbers` and `settings.skipOneForHundred` no longer do anything.** They still exist as `[Obsolete]` properties so code keeps compiling. The separator comes from `specialNumbers.compoundSeparator`; the hundreds wording comes from `numbers.hundreds[1]`.
+- **`settings.useCompoundNumbers` and `settings.skipOneForHundred` are gone.** They stopped having any effect and were removed here rather than left as dead properties for the life of 2.x. The separator comes from `specialNumbers.compoundSeparator`; the hundreds wording comes from `numbers.hundreds[1]`. The JSON keys are ignored on load, so a 1.x locale file still parses.
 - **`settings.useTeens` is now `bool?`.** Assignments still compile; comparisons such as `== true` still work.
-- `LocalizationModel.Currency` and `.Numbers` are now nullable, which is what they always were at runtime.
+- **`LocalizationModel.Currency` is gone.** A locale names its currencies in `currencies` and points at one with `defaultCurrency`; there is no second place to spell the default out. The `LocalizationModel(currency, numbers, settings)` constructor still takes a `CurrencyModel` and files it under the key `LocalizationModel.DefaultCurrencyKey`.
+- `LocalizationModel.Numbers` is now nullable, which is what it always was at runtime.
 
 ## Project structure
 

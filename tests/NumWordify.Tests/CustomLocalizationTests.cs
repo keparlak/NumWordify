@@ -11,7 +11,11 @@ public class CustomLocalizationTests
     {
         var japanese = new LocalizationModel
         {
-            Currency = new CurrencyModel { Major = "YEN", Minor = "SEN" },
+            Currencies = new Dictionary<string, CurrencyModel>
+            {
+                ["JPY"] = new() { Major = "YEN", Minor = "SEN" },
+            },
+            DefaultCurrency = "JPY",
             Numbers = new NumbersModel
             {
                 Ones = ["", "ICHI", "NI", "SAN", "YON", "GO", "ROKU", "NANA", "HACHI", "KYU"],
@@ -41,7 +45,8 @@ public class CustomLocalizationTests
     {
         var yen = new LocalizationModel
         {
-            Currency = new CurrencyModel { Major = "YEN" },
+            Currencies = new Dictionary<string, CurrencyModel> { ["JPY"] = new() { Major = "YEN" } },
+            DefaultCurrency = "JPY",
             Numbers = TestLocalizations.English(),
             Settings = new SettingsModel
             {
@@ -64,7 +69,11 @@ public class CustomLocalizationTests
     {
         var dinar = new LocalizationModel
         {
-            Currency = new CurrencyModel { Major = "DINARS", Minor = "MILLIMES" },
+            Currencies = new Dictionary<string, CurrencyModel>
+            {
+                ["TND"] = new() { Major = "DINARS", Minor = "MILLIMES" },
+            },
+            DefaultCurrency = "TND",
             Numbers = TestLocalizations.English(),
             Settings = new SettingsModel
             {

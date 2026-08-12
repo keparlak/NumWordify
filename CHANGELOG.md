@@ -70,6 +70,16 @@ bug fixes. See "Migrating from 1.x" in the README before upgrading.
 - The blanket whitespace collapse that cleaned up after empty placeholders also rewrote
   separators a locale had chosen on purpose. An empty placeholder now takes its own
   preceding space with it instead.
+- **The README's own recipe for guarding `CultureInfo.CurrentCulture` threw.**
+  `IsCultureSupported` answers "do the number words resolve?", but converting with
+  currency also requires the region to match, and the two differ for every culture that
+  resolves by language fallback: the guard accepted 187 installed cultures while
+  `ToWords` threw for 178 of them. `IsCultureSupported(culture, out bool currencyApplies)`
+  now answers both questions, and the README uses it.
+- **The test covering that recipe could not fail.** It ran the snippet against the ambient
+  `CultureInfo.CurrentCulture` and asserted only that the result was non-empty, so it
+  passed on every machine and CI runner in use while the recipe it documented was broken.
+  It is parameterised over the machine culture now, including `en-GB` and `es-MX`.
 
 ### Added
 
@@ -84,7 +94,9 @@ bug fixes. See "Migrating from 1.x" in the README before upgrading.
   request. Previously nothing was compiled before a release tag.
 - `INumberToWordsConverter`, so consumers can substitute the converter in their own tests.
 - `NumberToWordsConverter.SupportedCultures` and `IsCultureSupported`, so a culture can be
-  probed without catching an exception.
+  probed without catching an exception. The `out bool currencyApplies` overload also
+  answers whether the resolved locale's default currency applies to the requested culture,
+  which is the question `Convert` actually asks.
 - Localization caching. Each locale is parsed and validated once per process rather than
   on every call; `ToWords` was doing a full manifest scan and JSON parse per invocation.
 - Per-locale currency maps and `ToWords(culture, "EUR")`, so one locale file can serve
@@ -97,13 +109,20 @@ bug fixes. See "Migrating from 1.x" in the README before upgrading.
   `specialNumbers.specialBeforeScale`, `settings.useExactHundredsBeforeScale`,
   `settings.apocopateBeforeNoun` and `settings.nounScaleLinkWord` — the rules French and
   Spanish need and a flat digit table cannot express.
-- `LocalizationModel.DefaultCurrency`, so a locale names its default currency by key
-  instead of spelling it out a second time next to the `currencies` map.
+- `LocalizationModel.DefaultCurrency`, the single place a locale names its default
+  currency: a key into the `currencies` map rather than a second copy beside it.
 - `LocalizationModel.Deprecated`, which keeps a redundant locale resolvable by name while
   removing it from `SupportedCultures` and from language fallback.
 - `global.json` and a pinned `AnalysisLevel`, so a new SDK band cannot turn a release
   build red without a code change.
-- `WordifyOptions`, covering the combinations the overload matrix does not.
+- `WordifyOptions`, covering the combinations the overload matrix does not, together with
+  `NumberToWordsConverter(WordifyOptions)`. The options are now resolved in the converter
+  itself, so culture-versus-localization and currency-versus-currency-code precedence is
+  decided in one place instead of being restated in the extension methods.
+- Tests that exercise `numbers.scaleKinds`, `settings.useExactHundredsBeforeScale`,
+  `settings.apocopateBeforeNoun` and `settings.nounScaleLinkWord` one at a time on a
+  synthetic locale. They were previously covered only through the two shipped locales that
+  set them, always in the same combination.
 - Exception hierarchy rooted at `NumWordifyException`.
 - Analyzers, `.editorconfig` and `TreatWarningsAsErrors` across the build.
 
@@ -123,8 +142,10 @@ bug fixes. See "Migrating from 1.x" in the README before upgrading.
 - Culture lookup is case-insensitive and falls back within a language, so `"EN-US"`,
   `"en"` and `"en-GB"` all resolve to `en-US`.
 - `NumberToWordsConverter` is `sealed`.
-- `LocalizationModel.Currency` and `.Numbers` are nullable, reflecting what was already
-  true at runtime.
+- `LocalizationModel.Numbers` is nullable, reflecting what was already true at runtime.
+- `LocalizationModel(currency, numbers, settings)` files the currency in `Currencies`
+  under `LocalizationModel.DefaultCurrencyKey` and points `DefaultCurrency` at it, so the
+  convenience constructor builds the same shape a hand-written model would.
 - `settings.useTeens` is `bool?`; unset means "use teens when they are supplied".
 - The package version comes from the release tag. It was hardcoded to `1.0.0`, so every
   tag produced the same package and `--skip-duplicate` swallowed the push while the job
@@ -144,14 +165,20 @@ bug fixes. See "Migrating from 1.x" in the README before upgrading.
 
 ### Deprecated
 
-- `settings.useCompoundNumbers` and `settings.skipOneForHundred` have no effect and will
-  be removed in 3.0. They remain as `[Obsolete]` properties so existing code compiles.
 - `tr-TR-EUR` is marked deprecated: excluded from `SupportedCultures` and from language
   fallback, resolvable only by exact name. Use `ToWords("tr-TR", "EUR")`, which a test
   proves produces identical output.
 
 ### Removed
 
+- `settings.useCompoundNumbers` and `settings.skipOneForHundred`. Both stopped having any
+  effect, and a major release is the window in which removing them is free — leaving them
+  as `[Obsolete]` properties would have kept two do-nothing members in the public surface
+  for the life of 2.x. No bundled locale set either key, and unmapped JSON keys are
+  ignored on load, so a 1.x locale file still parses.
+- `LocalizationModel.Currency`. A locale lists its currencies in `currencies` and names
+  the default with `defaultCurrency`; there is no second way to spell it out, and no
+  mutual-exclusion rule left to police. The single-currency constructor is unchanged.
 - `FileNotFoundException` is no longer thrown for an unknown culture; catch
   `LocalizationNotFoundException` (or `NumWordifyException`) instead.
 - The undocumented claim of caching support is gone from the README — replaced by actual

@@ -84,6 +84,29 @@ internal static class LocalizationLoader
         !string.IsNullOrWhiteSpace(culture) && TryResolveResourceName(culture!, out _, out _);
 
     /// <summary>
+    /// Determines whether a localization resource can be resolved for the given culture,
+    /// and whether that resource's default currency applies to it.
+    /// </summary>
+    /// <remarks>
+    /// Resolving and converting-with-currency are two different questions: a culture that
+    /// matched only by language keeps the number words but loses the claim to the locale's
+    /// currency, and a locale is free to define none at all.
+    /// </remarks>
+    public static bool IsSupported(string? culture, out bool currencyApplies)
+    {
+        currencyApplies = false;
+
+        if (string.IsNullOrWhiteSpace(culture) ||
+            !TryResolveResourceName(culture!, out var resourceName, out var regionMatches))
+        {
+            return false;
+        }
+
+        currencyApplies = regionMatches && Cache.GetOrAdd(resourceName, Parse).DefaultCurrency is not null;
+        return true;
+    }
+
+    /// <summary>
     /// Returns the cached, validated localization for the given culture, together with
     /// how closely it matched.
     /// </summary>

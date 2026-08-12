@@ -113,20 +113,23 @@ public class ValidationGapTests
     }
 
     [Fact]
-    public void Naming_the_default_currency_twice_is_rejected()
+    public void The_single_currency_constructor_registers_it_as_the_default()
     {
-        var localization = TestLocalizations.EnglishWithoutCurrency();
-        localization.Currency = new CurrencyModel { Major = "DOLLARS", Minor = "CENTS" };
-        localization.Currencies = new Dictionary<string, CurrencyModel>
+        // There is one place a default currency can be named. The convenience constructor
+        // does not open a second one: it files the currency in the same map and points
+        // defaultCurrency at it, so the model it builds is the model you would write.
+        var currency = new CurrencyModel { Major = "DOLLARS", Minor = "CENTS" };
+        var localization = new LocalizationModel(
+            currency,
+            TestLocalizations.English(),
+            TestLocalizations.EnglishSettings())
         {
-            ["USD"] = new() { Major = "DOLLARS", Minor = "CENTS" },
+            SpecialNumbers = TestLocalizations.EnglishSpecials(),
         };
-        localization.DefaultCurrency = "USD";
 
-        var exception = Assert.Throws<InvalidLocalizationException>(
-            () => new NumberToWordsConverter(localization));
-
-        Assert.Contains("defaultCurrency", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(LocalizationModel.DefaultCurrencyKey, localization.DefaultCurrency);
+        Assert.Same(currency, localization.Currencies![LocalizationModel.DefaultCurrencyKey]);
+        Assert.Equal("ONE DOLLARS ZERO CENTS", 1m.ToWords(localization));
     }
 
     [Fact]
@@ -167,10 +170,7 @@ public class ValidationGapTests
     public void Options_do_not_silently_drop_a_currency_code()
     {
         var localization = TestLocalizations.English(new CurrencyModel { Major = "DOLLARS", Minor = "CENTS" });
-        localization.Currencies = new Dictionary<string, CurrencyModel>
-        {
-            ["EUR"] = new() { Major = "EUROS", Minor = "CENTS" },
-        };
+        localization.Currencies!["EUR"] = new CurrencyModel { Major = "EUROS", Minor = "CENTS" };
 
         Assert.Equal(
             "ONE EUROS ZERO CENTS",

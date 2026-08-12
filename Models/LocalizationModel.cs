@@ -9,19 +9,15 @@ namespace NumWordify.Models;
 public class LocalizationModel
 {
     /// <summary>
-    /// Gets or sets the default currency used by <c>Convert</c> when no override is supplied.
+    /// The key the single-currency constructor files its currency under, for a model that
+    /// names no ISO 4217 code of its own.
     /// </summary>
-    /// <remarks>
-    /// Prefer <see cref="DefaultCurrency"/> when the currency is already listed in
-    /// <see cref="Currencies"/>; naming it twice is how the two copies drift apart.
-    /// </remarks>
-    [JsonPropertyName("currency")]
-    public CurrencyModel? Currency { get; set; }
+    public const string DefaultCurrencyKey = "DEFAULT";
 
     /// <summary>
-    /// Gets or sets the key into <see cref="Currencies"/> naming the default currency, as
-    /// an alternative to spelling it out again in <see cref="Currency"/>. Ignored when
-    /// <see cref="Currency"/> is set.
+    /// Gets or sets the key into <see cref="Currencies"/> naming the currency <c>Convert</c>
+    /// uses when no override is supplied. A locale that only ever names one currency still
+    /// lists it in <see cref="Currencies"/> and points at it from here.
     /// </summary>
     [JsonPropertyName("defaultCurrency")]
     public string? DefaultCurrency { get; set; }
@@ -70,14 +66,17 @@ public class LocalizationModel
     }
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="LocalizationModel"/> class.
+    /// Initializes a new instance of the <see cref="LocalizationModel"/> class with a
+    /// single currency, registered in <see cref="Currencies"/> under
+    /// <see cref="DefaultCurrencyKey"/>.
     /// </summary>
     /// <param name="currency">The default currency.</param>
     /// <param name="numbers">The number words.</param>
     /// <param name="settings">Optional formatting settings.</param>
     public LocalizationModel(CurrencyModel currency, NumbersModel numbers, SettingsModel? settings = null)
     {
-        Currency = currency;
+        Currencies = new Dictionary<string, CurrencyModel> { [DefaultCurrencyKey] = currency };
+        DefaultCurrency = DefaultCurrencyKey;
         Numbers = numbers;
         Settings = settings ?? new SettingsModel();
     }

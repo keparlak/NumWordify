@@ -1,5 +1,6 @@
 using System.Globalization;
 using NumWordify.Converters;
+using NumWordify.Exceptions;
 using NumWordify.Extensions;
 using NumWordify.Models;
 using Xunit;
@@ -87,14 +88,37 @@ public class ReadmeExampleTests
         Assert.Equal("ONE POINT TWO FIVE", 1.25M.ToWordsWithoutCurrency(digits));
     }
 
-    [Fact]
-    public void Culture_fallback_example()
+    [Theory]
+    [InlineData("en-US", true, true)]
+    [InlineData("en-GB", true, false)]
+    [InlineData("es-MX", true, false)]
+    [InlineData("es", true, true)]
+    [InlineData("de-DE", false, false)]
+    public void Culture_guard_example(string machineCulture, bool supported, bool currencyApplies)
     {
-        var culture = NumberToWordsConverter.IsCultureSupported(CultureInfo.CurrentCulture)
-            ? CultureInfo.CurrentCulture.Name
+        // Parameterised over the machine culture on purpose. The previous version of this
+        // test ran the README recipe against CultureInfo.CurrentCulture and asserted only
+        // that the output was non-empty, so it passed on every machine and CI runner the
+        // project has ever used — while the recipe it documented threw for 178 of the 187
+        // cultures that IsCultureSupported accepts.
+        var machine = new CultureInfo(machineCulture);
+
+        Assert.Equal(supported, NumberToWordsConverter.IsCultureSupported(machine, out var actual));
+        Assert.Equal(currencyApplies, actual);
+
+        var culture = NumberToWordsConverter.IsCultureSupported(machine, out var applies) && applies
+            ? machine.Name
             : "en-US";
 
         Assert.False(string.IsNullOrWhiteSpace(1234.56M.ToWords(culture)));
+    }
+
+    [Fact]
+    public void Culture_without_a_matching_region_examples()
+    {
+        Assert.Equal("ONE POINT ZERO", 1M.ToWordsWithoutCurrency("en-GB"));
+        Assert.Equal("ONE POUND ZERO PENCE", 1M.ToWords("en-GB", "GBP"));
+        Assert.Throws<AmbiguousCurrencyException>(() => 1M.ToWords("en-GB"));
     }
 
     [Fact]
@@ -108,7 +132,11 @@ public class ReadmeExampleTests
     {
         var japanese = new LocalizationModel
         {
-            Currency = new CurrencyModel { Major = "YEN", Minor = "SEN" },
+            Currencies = new Dictionary<string, CurrencyModel>
+            {
+                ["JPY"] = new() { Major = "YEN", Minor = "SEN" },
+            },
+            DefaultCurrency = "JPY",
             Numbers = new NumbersModel
             {
                 Ones = ["", "ICHI", "NI", "SAN", "YON", "GO", "ROKU", "NANA", "HACHI", "KYU"],
@@ -139,15 +167,16 @@ public class ReadmeExampleTests
         // The JSON block in the README, expressed as the model it deserializes into.
         var localization = new LocalizationModel
         {
-            Currency = new CurrencyModel
-            {
-                Major = "DOLLARS",
-                MajorSingular = "DOLLAR",
-                Minor = "CENTS",
-                MinorSingular = "CENT",
-            },
+            DefaultCurrency = "USD",
             Currencies = new Dictionary<string, CurrencyModel>
             {
+                ["USD"] = new()
+                {
+                    Major = "DOLLARS",
+                    MajorSingular = "DOLLAR",
+                    Minor = "CENTS",
+                    MinorSingular = "CENT",
+                },
                 ["EUR"] = new()
                 {
                     Major = "EUROS",

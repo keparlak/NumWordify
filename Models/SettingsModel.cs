@@ -130,20 +130,4 @@ public class SettingsModel
     /// </summary>
     [JsonPropertyName("decimalReading")]
     public DecimalReadingMode DecimalReading { get; set; } = DecimalReadingMode.Fraction;
-
-    /// <summary>
-    /// No longer used. The ones digit is always written; the separator between the tens
-    /// and ones word comes from <see cref="SpecialNumbersModel.CompoundSeparator"/>.
-    /// </summary>
-    [Obsolete("Has no effect. The ones digit is always written; set SpecialNumbers.CompoundSeparator to control the separator. This property will be removed in 3.0.")]
-    [JsonPropertyName("useCompoundNumbers")]
-    public bool UseCompoundNumbers { get; set; }
-
-    /// <summary>
-    /// No longer used. Whether a locale says "one hundred" or just "hundred" is decided by
-    /// the value stored at index 1 of <see cref="NumbersModel.Hundreds"/>.
-    /// </summary>
-    [Obsolete("Has no effect. Set Numbers.Hundreds[1] to the desired wording instead. This property will be removed in 3.0.")]
-    [JsonPropertyName("skipOneForHundred")]
-    public bool SkipOneForHundred { get; set; }
 }
