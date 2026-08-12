@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using NumWordify.Exceptions;
 using NumWordify.Models;
@@ -58,7 +59,8 @@ internal static class LocalizationValidator
         if (settings.DecimalPlaces is < 0 or > MaxDecimalPlaces)
         {
             throw Invalid(source,
-                $"'settings.decimalPlaces' must be between 0 and {MaxDecimalPlaces}, but is {settings.DecimalPlaces}.");
+                $"'settings.decimalPlaces' must be between 0 and {MaxDecimalPlaces}, " +
+                $"but is {settings.DecimalPlaces.ToString(CultureInfo.InvariantCulture)}.");
         }
 
         ValidateSpecialNumbers(localization, settings, source);
@@ -200,7 +202,8 @@ internal static class LocalizationValidator
             if (pair.Key is < 1 or > 99)
             {
                 throw Invalid(source,
-                    $"'{path}' contains the key {pair.Key}. Keys override the last two digits of a group " +
+                    $"'{path}' contains the key {pair.Key.ToString(CultureInfo.InvariantCulture)}. " +
+                    "Keys override the last two digits of a group " +
                     "and must be between 1 and 99; key 0 is never consulted.");
             }
 

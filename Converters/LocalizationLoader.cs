@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
@@ -41,8 +42,9 @@ internal sealed class ResolvedLocalization
 /// Parsing a locale costs an assembly manifest scan, a stream read and a full JSON
 /// deserialization. Doing that per call made <c>ToWords</c> roughly twenty-five times
 /// slower than necessary, so every parsed model is cached here for the lifetime of the
-/// process. The cached instances are never handed out to callers, which is what makes
-/// sharing them safe.
+/// process. The cached models are never handed out to callers, and the one cached
+/// collection that is — the supported-culture list — is wrapped so it cannot be written
+/// through. That is what makes sharing them safe.
 /// </remarks>
 internal static class LocalizationLoader
 {
@@ -65,12 +67,17 @@ internal static class LocalizationLoader
     private static readonly ConcurrentDictionary<string, LocalizationModel> Cache =
         new(StringComparer.Ordinal);
 
-    private static readonly Lazy<IReadOnlyList<string>> SupportedCultureNames = new(() =>
-        ResourceNames.Value
-            .Select(CultureNameOf)
-            .Where(culture => !Load(culture).Deprecated)
-            .OrderBy(culture => culture, StringComparer.Ordinal)
-            .ToArray());
+    // Wrapped rather than handed out as the string[] it is built from. This is the
+    // process-wide cache, so a caller who cast the declared IReadOnlyList<string> back to
+    // string[] could rewrite it permanently — including the text of every exception the
+    // library throws afterwards.
+    private static readonly Lazy<ReadOnlyCollection<string>> SupportedCultureNames = new(() =>
+        new ReadOnlyCollection<string>(
+            ResourceNames.Value
+                .Select(CultureNameOf)
+                .Where(culture => !Load(culture).Deprecated)
+                .OrderBy(culture => culture, StringComparer.Ordinal)
+                .ToArray()));
 
     /// <summary>
     /// Gets the culture names shipped with the library, excluding deprecated ones.
