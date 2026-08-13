@@ -178,6 +178,7 @@ If you pass your own `LocalizationModel`, the converter keeps a reference rather
 - Digits beyond that precision are rounded away, not truncated: `1.234567` becomes twenty-three cents, `1.235` becomes twenty-four.
 - A fraction that rounds up carries into the whole part: `0.999` becomes "ONE DOLLAR ZERO CENTS".
 - `decimalPlaces` accepts 0 through 6. Use 0 for currencies without a minor unit, 3 for the Tunisian dinar. With 0, the format strings must not reference `{decimal}` or `{minor}` — validation enforces this, because they would print the zero word on every amount.
+- The fraction is read as a number in its own right, so it needs scale words of its own: one per three decimal places. `decimalPlaces` of 4 or more therefore requires at least two entries in `numbers.scales`. Validation enforces this too, because otherwise `1.1234` failed at conversion time with "the number is too large" — blaming a whole part of 1.
 
 By default `ConvertWithoutCurrency` reads the fraction the way money is read, so `1.5` is "ONE POINT FIFTY" (fifty hundredths). Set `"decimalReading": "Digits"` in a locale to read it digit by digit instead — `1.5` becomes "ONE POINT FIVE" and `1.25` becomes "ONE POINT TWO FIVE".
 
@@ -341,7 +342,7 @@ Then approve the snapshot: run the test suite with `NUMWORDIFY_APPROVE=1`, which
 | `negativeWord`, `zeroWord` | — | Required. |
 | `currencyFormat` | — | Required. Placeholders: `{whole}`, `{major}`, `{decimal}`, `{minor}`. Must contain `{whole}`; unknown placeholders are rejected. |
 | `numberFormat` | — | Required. Placeholders: `{whole}`, `{decimal}`. |
-| `decimalPlaces` | `2` | Fractional digits kept, 0 through 6. |
+| `decimalPlaces` | `2` | Fractional digits kept, 0 through 6. Needs one `scales` entry per three digits, since the fraction is read as a number. |
 | `decimalReading` | `Fraction` | `Fraction` or `Digits`; see [Precision and rounding](#precision-and-rounding). |
 
 `specialNumbers`

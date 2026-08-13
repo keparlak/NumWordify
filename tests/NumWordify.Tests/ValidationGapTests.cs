@@ -27,6 +27,74 @@ public class ValidationGapTests
     }
 
     [Fact]
+    public void Decimal_places_the_scale_words_cannot_reach_are_rejected()
+    {
+        // Used to construct fine and then throw "The number 1.123456 is too large for this
+        // locale" — blaming a whole part of 1. The fraction is what needed the scale word.
+        var localization = TestLocalizations.EnglishWithoutCurrency();
+        localization.Numbers!.Scales = [""];
+        localization.Settings.DecimalPlaces = 6;
+
+        var exception = Assert.Throws<InvalidLocalizationException>(
+            () => new NumberToWordsConverter(localization));
+
+        Assert.Contains("decimalPlaces", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("numbers.scales", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 1)]
+    [InlineData(2, 1)]
+    [InlineData(3, 1)]
+    [InlineData(4, 2)]
+    [InlineData(5, 2)]
+    [InlineData(6, 2)]
+    public void A_fraction_needs_one_scale_word_per_three_decimal_places(int decimalPlaces, int requiredScales)
+    {
+        // Exactly enough is accepted, and one short is not. Pinning both sides is the
+        // point: a rule that only rejects is free to be too strict.
+        Assert.Null(Record.Exception(() => new NumberToWordsConverter(WithScales(requiredScales))));
+
+        if (requiredScales > 1)
+            Assert.Throws<InvalidLocalizationException>(() => new NumberToWordsConverter(WithScales(requiredScales - 1)));
+
+        LocalizationModel WithScales(int count)
+        {
+            var localization = TestLocalizations.EnglishWithoutCurrency();
+            // Not a range expression: the suite also runs on net48, which has no System.Range.
+            localization.Numbers!.Scales = new[] { "", "THOUSAND", "MILLION" }.Take(count).ToArray();
+            localization.Settings.DecimalPlaces = decimalPlaces;
+
+            // A locale with no decimal places must not reference the fraction either —
+            // a separate rule, and this theory is not about that one.
+            if (decimalPlaces == 0)
+            {
+                localization.Settings.NumberFormat = "{whole}";
+                localization.Settings.CurrencyFormat = "{whole} {major}";
+            }
+
+            return localization;
+        }
+    }
+
+    [Fact]
+    public void A_scale_kind_outside_the_enum_is_rejected()
+    {
+        // An enum in C# is only an int, so a model built in code can carry a value the
+        // JSON converter would never produce. The conversion loop asks "noun or not", so
+        // an undefined kind silently reads as an adjective.
+        var localization = TestLocalizations.EnglishWithoutCurrency();
+        localization.Numbers!.ScaleKinds = [ScaleKind.Adjective, (ScaleKind)7, ScaleKind.Noun];
+
+        var exception = Assert.Throws<InvalidLocalizationException>(
+            () => new NumberToWordsConverter(localization));
+
+        Assert.Contains("scaleKinds[1]", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("7", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void An_empty_entry_in_the_plural_scale_table_falls_back()
     {
         var localization = TestLocalizations.EnglishWithoutCurrency();
