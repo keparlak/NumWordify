@@ -409,6 +409,7 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
         var remaining = value;
         var scale = 0;
         var isLowestGroup = true;
+        var lowestGroup = 0;
 
         while (remaining > 0m)
         {
@@ -434,6 +435,7 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
                 if (isLowestGroup)
                 {
                     endsWithNounScale = scaleIsNoun;
+                    lowestGroup = group;
                     isLowestGroup = false;
                 }
             }
@@ -442,7 +444,27 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
             scale++;
         }
 
-        return string.Join(" ", groups);
+        return JoinGroups(groups, lowestGroup);
+    }
+
+    /// <summary>
+    /// Joins the groups of a number, honouring
+    /// <see cref="SettingsModel.FinalGroupSeparator"/> when the last group is a single
+    /// term — below one hundred, or a whole number of hundreds.
+    /// </summary>
+    private string JoinGroups(List<string> groups, int lowestGroup)
+    {
+        var separator = _localization.Settings.FinalGroupSeparator;
+
+        // A group of 234 is three terms, so Portuguese reads MIL DUZENTOS E TRINTA E
+        // QUATRO with no conjunction after MIL; 800 and 22 are one term each, so they get
+        // MIL E OITOCENTOS and MIL E VINTE E DOIS.
+        var lastIsSingleTerm = lowestGroup < 100 || lowestGroup % 100 == 0;
+
+        if (string.IsNullOrEmpty(separator) || groups.Count < 2 || !lastIsSingleTerm)
+            return string.Join(" ", groups);
+
+        return string.Join(" ", groups.Take(groups.Count - 1)) + separator + groups[groups.Count - 1];
     }
 
     private string ScaleWord(int scale, int group)
@@ -473,7 +495,7 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
                 parts.Add(word);
         }
 
-        return string.Join(" ", parts);
+        return string.Join(_localization.Settings.HundredsSeparator, parts);
     }
 
     private string HundredsWord(int hundreds, int remainder, int scale)

@@ -90,6 +90,35 @@ public class SettingsModel
     public string? NounScaleLinkWord { get; set; }
 
     /// <summary>
+    /// Gets or sets what goes between the hundreds word and the rest of the same group.
+    /// Defaults to a single space.
+    /// </summary>
+    /// <remarks>
+    /// Portuguese joins them with a conjunction — <c>CENTO E VINTE</c>, and
+    /// <c>DUZENTOS E TRINTA E QUATRO</c> where <see cref="SpecialNumbersModel.CompoundSeparator"/>
+    /// supplies the second <c>E</c>. Spanish, which uses <c>Y</c> between tens and ones,
+    /// does not: <c>CIENTO VEINTE</c>. The two positions are separate rules, so they are
+    /// separate settings.
+    /// </remarks>
+    [JsonPropertyName("hundredsSeparator")]
+    public string HundredsSeparator { get; set; } = " ";
+
+    /// <summary>
+    /// Gets or sets what goes in front of the last group of a number when that group is a
+    /// single term — below one hundred, or a whole number of hundreds. Optional; a plain
+    /// space is used when it is unset, and whenever the last group is not a single term.
+    /// </summary>
+    /// <remarks>
+    /// This is the one place where the separator depends on the value rather than on the
+    /// locale alone. Portuguese requires it: <c>MIL E OITOCENTOS</c> (1800) and
+    /// <c>MIL E VINTE E DOIS</c> (1022), but <c>MIL OITOCENTOS E NOVENTA E DOIS</c> (1892),
+    /// where the last group is not a single term. Cunha and Cintra, <i>Nova Gramática do
+    /// Português Contemporâneo</i> (1984, p. 372).
+    /// </remarks>
+    [JsonPropertyName("finalGroupSeparator")]
+    public string? FinalGroupSeparator { get; set; }
+
+    /// <summary>
     /// Gets or sets the word placed in front of negative numbers.
     /// </summary>
     [JsonPropertyName("negativeWord")]

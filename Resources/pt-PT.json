@@ -1,0 +1,91 @@
+{
+  "defaultCurrency": "EUR",
+  "currencies": {
+    "EUR": {
+      "major": "EUROS",
+      "majorSingular": "EURO",
+      "minor": "CÊNTIMOS",
+      "minorSingular": "CÊNTIMO"
+    },
+    "USD": {
+      "major": "DÓLARES",
+      "majorSingular": "DÓLAR",
+      "minor": "CENTAVOS",
+      "minorSingular": "CENTAVO"
+    },
+    "BRL": {
+      "major": "REAIS",
+      "majorSingular": "REAL",
+      "minor": "CENTAVOS",
+      "minorSingular": "CENTAVO"
+    }
+  },
+  "settings": {
+    "skipOneForThousand": true,
+    "nounScaleLinkWord": "DE",
+    "hundredsSeparator": " E ",
+    "finalGroupSeparator": " E ",
+    "negativeWord": "MENOS",
+    "zeroWord": "ZERO",
+    "currencyFormat": "{whole} {major} E {decimal} {minor}",
+    "numberFormat": "{whole} VÍRGULA {decimal}",
+    "decimalPlaces": 2,
+    "useTeens": true
+  },
+  "numbers": {
+    "ones": [
+      "",
+      "UM",
+      "DOIS",
+      "TRÊS",
+      "QUATRO",
+      "CINCO",
+      "SEIS",
+      "SETE",
+      "OITO",
+      "NOVE"
+    ],
+    "tens": [
+      "",
+      "DEZ",
+      "VINTE",
+      "TRINTA",
+      "QUARENTA",
+      "CINQUENTA",
+      "SESSENTA",
+      "SETENTA",
+      "OITENTA",
+      "NOVENTA"
+    ],
+    "hundreds": [
+      "",
+      "CENTO",
+      "DUZENTOS",
+      "TREZENTOS",
+      "QUATROCENTOS",
+      "QUINHENTOS",
+      "SEISCENTOS",
+      "SETECENTOS",
+      "OITOCENTOS",
+      "NOVECENTOS"
+    ],
+    "exactHundreds": ["", "CEM", "", "", "", "", "", "", "", ""],
+    "scales": ["", "MIL", "MILHÃO"],
+    "scalesPlural": ["", "", "MILHÕES"],
+    "scaleKinds": ["Adjective", "Adjective", "Noun"]
+  },
+  "specialNumbers": {
+    "teens": [
+      "ONZE",
+      "DOZE",
+      "TREZE",
+      "CATORZE",
+      "QUINZE",
+      "DEZASSEIS",
+      "DEZASSETE",
+      "DEZOITO",
+      "DEZANOVE"
+    ],
+    "compoundSeparator": " E "
+  }
+}

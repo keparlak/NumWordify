@@ -3,6 +3,53 @@
 All notable changes to this project are documented in this file.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [2.2.0] - 2026-08-13
+
+European Portuguese, and the two schema concepts it turned out to need. Output for the
+four existing locales is unchanged — their approved snapshots are byte-identical, which
+is the point of having them.
+
+### Added
+
+- **`pt-PT`**, the fifth shipped locale. Default currency EUR; also defines USD and BRL.
+  Covers `CEM`/`CENTO`, the teens, plural scale words, and `de` before a currency name —
+  the last of those reusing the setting Spanish already had, unchanged.
+- **`settings.hundredsSeparator`** (defaults to a space): what goes between the hundreds
+  word and the rest of the same group. Portuguese reads `CENTO E VINTE`; Spanish, which
+  uses `Y` between tens and ones, reads `CIENTO VEINTE`. Two positions, two rules, two
+  settings.
+- **`settings.finalGroupSeparator`** (optional): what goes in front of the last group when
+  that group is a single term — below one hundred, or a whole number of hundreds. This is
+  the first setting whose effect depends on the *value* rather than on the locale alone.
+  Portuguese requires exactly that distinction: `MIL E OITOCENTOS` (1800) and
+  `MIL E VINTE E DOIS` (1022), but `MIL OITOCENTOS E NOVENTA E DOIS` (1892). The rule is
+  Cunha and Cintra, *Nova Gramática do Português Contemporâneo* (1984, p. 372).
+
+### Changed
+
+- The golden snapshots record a locale's ceiling instead of assuming every locale shares
+  one. Values a locale cannot express are written as `<out of range>` rather than dropped
+  from the ladder, so a changed ceiling shows up as a reviewable diff. The same assumption
+  is removed from `EmbeddedResourceTests`, which now asserts a floor every locale must
+  reach (10^9 − 1) and allows a documented refusal above it.
+
+### Known limitations
+
+- `pt-PT` stops at 10^9 − 1. European Portuguese reads that value as *mil milhões* — two
+  words, with the "um" dropped — and the scale table holds one word per step with no way
+  to drop it, so defining it would produce "UM MIL MILHÕES" for 10^9 itself. Left
+  undefined rather than made wrong.
+
+### Note on the architecture question
+
+Two earlier reviews proposed replacing the converter's branching with a rule engine; the
+third measured the code and argued the real constraint was schema expressiveness, and
+proposed a test: add a fifth language and count what it costs. Portuguese cost two new
+concepts, and the second is not a boolean — it is a rule that depends on the value being
+converted. A flag table cannot hold that shape. The count is at the threshold that was set
+in advance, so the question is open again rather than settled, and the next language
+should be treated as evidence rather than as a chore.
+
 ## [2.1.0] - 2026-08-13
 
 Three validation gaps, each of which let a custom localization construct successfully and

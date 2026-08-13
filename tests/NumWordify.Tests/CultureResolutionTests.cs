@@ -75,7 +75,7 @@ public class CultureResolutionTests
         // tr-TR-EUR is a currency variant, not a culture. Listing it invited callers to
         // treat "locale per currency" as the supported pattern.
         Assert.Equal(
-            ["en-US", "es-ES", "fr-FR", "tr-TR"],
+            ["en-US", "es-ES", "fr-FR", "pt-PT", "tr-TR"],
             NumberToWordsConverter.SupportedCultures);
     }
 
