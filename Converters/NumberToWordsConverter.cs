@@ -366,8 +366,8 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
             {
                 "whole" => wholeWords,
                 "decimal" => fractionWords,
-                "major" => currency is null ? string.Empty : Inflect(currency.Major, currency.MajorSingular, wholePart),
-                "minor" => currency is null ? string.Empty : Inflect(currency.Minor, currency.MinorSingular, fractionPart),
+                "major" => currency is null ? string.Empty : Inflect(currency.Major, currency.MajorSingular, currency.MajorForms, wholePart),
+                "minor" => currency is null ? string.Empty : Inflect(currency.Minor, currency.MinorSingular, currency.MinorForms, fractionPart),
                 _ => match.Value,
             };
 
@@ -384,8 +384,44 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
             : settings.NegativeWord + " " + result;
     }
 
-    private static string Inflect(string plural, string? singular, decimal value) =>
-        value == 1m && !string.IsNullOrEmpty(singular) ? singular! : plural;
+    private string Inflect(string plural, string? singular, Dictionary<PluralCategory, string>? forms, decimal value)
+    {
+        var category = CategoryOf(value);
+
+        if (forms is not null && forms.TryGetValue(category, out var word) && word.Length > 0)
+            return word;
+
+        return category == PluralCategory.One && !string.IsNullOrEmpty(singular) ? singular! : plural;
+    }
+
+    /// <summary>
+    /// The grammatical number the given count selects, under the locale's plural rule.
+    /// </summary>
+    private PluralCategory CategoryOf(decimal count) => _localization.Settings.PluralRule switch
+    {
+        PluralRule.EastSlavic => EastSlavicCategory(count),
+        _ => count == 1m ? PluralCategory.One : PluralCategory.Other,
+    };
+
+    // CLDR's rule for ru/uk/be. A fraction is always "other" — no Slavic language
+    // inflects a noun after "две целых пять десятых" the way it does after a whole two.
+    private static PluralCategory EastSlavicCategory(decimal count)
+    {
+        var value = Math.Abs(count);
+
+        if (value != Math.Floor(value))
+            return PluralCategory.Other;
+
+        var lastTwo = (long)(value % 100m);
+        var last = lastTwo % 10;
+
+        if (last == 1 && lastTwo != 11)
+            return PluralCategory.One;
+
+        return last is >= 2 and <= 4 && lastTwo is < 12 or > 14
+            ? PluralCategory.Few
+            : PluralCategory.Many;
+    }
 
     private ScaleKind KindOf(int scale)
     {
@@ -470,8 +506,18 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
     private string ScaleWord(int scale, int group)
     {
         var numbers = _localization.Numbers!;
+        var category = CategoryOf(group);
 
-        if (group > 1 && numbers.ScalesPlural is { } plural && plural[scale].Length > 0)
+        if (numbers.ScaleForms is { } forms &&
+            forms.TryGetValue(category, out var words) &&
+            words[scale].Length > 0)
+        {
+            return words[scale];
+        }
+
+        // 'scales' is the One form and 'scalesPlural' the Other one, which is the same
+        // statement in two words for a locale that only has two.
+        if (category != PluralCategory.One && numbers.ScalesPlural is { } plural && plural[scale].Length > 0)
             return plural[scale];
 
         return numbers.Scales[scale];

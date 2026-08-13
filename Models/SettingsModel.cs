@@ -90,6 +90,14 @@ public class SettingsModel
     public string? NounScaleLinkWord { get; set; }
 
     /// <summary>
+    /// Gets or sets how a count selects a grammatical number. Defaults to
+    /// <see cref="Models.PluralRule.OneOther"/>, which is what English, Turkish, French,
+    /// Spanish and Portuguese use.
+    /// </summary>
+    [JsonPropertyName("pluralRule")]
+    public PluralRule PluralRule { get; set; } = PluralRule.OneOther;
+
+    /// <summary>
     /// Gets or sets what goes between the hundreds word and the rest of the same group.
     /// Defaults to a single space.
     /// </summary>

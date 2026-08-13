@@ -38,4 +38,19 @@ public class CurrencyModel
     /// </summary>
     [JsonPropertyName("minorSingular")]
     public string? MinorSingular { get; set; }
+
+    /// <summary>
+    /// Gets or sets the major unit per grammatical number, for locales whose plural rule
+    /// has more than two forms. Falls back to <see cref="MajorSingular"/> and
+    /// <see cref="Major"/>.
+    /// </summary>
+    [JsonPropertyName("majorForms")]
+    public Dictionary<PluralCategory, string>? MajorForms { get; set; }
+
+    /// <summary>
+    /// Gets or sets the minor unit per grammatical number. Falls back to
+    /// <see cref="MinorSingular"/> and <see cref="Minor"/>.
+    /// </summary>
+    [JsonPropertyName("minorForms")]
+    public Dictionary<PluralCategory, string>? MinorForms { get; set; }
 }

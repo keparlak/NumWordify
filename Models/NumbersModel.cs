@@ -93,4 +93,17 @@ public class NumbersModel
     /// </summary>
     [JsonPropertyName("scaleKinds")]
     public ScaleKind[]? ScaleKinds { get; set; }
+
+    /// <summary>
+    /// Gets or sets scale words per grammatical number, for locales whose plural rule has
+    /// more than two forms. Each array is parallel to <see cref="Scales"/>; empty entries
+    /// fall back to <see cref="ScalesPlural"/> and then to <see cref="Scales"/>.
+    /// </summary>
+    /// <remarks>
+    /// Russian needs three: ТЫСЯЧА, ТЫСЯЧИ, ТЫСЯЧ. A two-form locale has no reason to set
+    /// this — <see cref="Scales"/> and <see cref="ScalesPlural"/> say the same thing with
+    /// less ceremony.
+    /// </remarks>
+    [JsonPropertyName("scaleForms")]
+    public Dictionary<PluralCategory, string[]>? ScaleForms { get; set; }
 }
