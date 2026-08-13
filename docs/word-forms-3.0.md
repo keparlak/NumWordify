@@ -96,16 +96,25 @@ category for the dual, which means a new `pluralRule` family and a new `PluralCa
 member. At that point the fields are being edited anyway, and consolidating is nearly
 free.
 
-Two smaller items are queued behind the same decision, both recorded and both deliberately
-not done:
+Two smaller items were queued behind the same decision. Both are now settled:
 
-- Collapsing the converter's three "what follows this group" derivations into one enum.
-  Unblocked since 2.1.0 validated `scaleKinds` values — the refactor's earlier
-  counterexample is now unrepresentable — but it is a change to the conversion core with
-  no user-visible benefit, and 2.3.0's gender work already threads a following-word concept
-  through those same signatures. Do both at once or neither.
-- Whether `net6.0` and `net7.0` stay in `TargetFrameworks`. Both are out of support. If
-  they go, the test legs proposed for them are wasted work; if they stay, they are overdue.
+- Collapsing the converter's "what follows this group" derivations into one concept —
+  **done**. 2.3.0's gender work made it four parallel answers rather than three, which
+  settled the "do both at once or neither" question by making it one job. Safe because
+  2.1.0 validated `scaleKinds` values, so the counterexample that rejected the refactor
+  during the 2.0.1 review is now unrepresentable.
+- Whether `net6.0` and `net7.0` stay in `TargetFrameworks` — **they stay**. Both are out
+  of support upstream, but supporting consumers who have not moved is a stated value of
+  this project, not an oversight to be tidied away. That settles the question the other
+  way round from the usual reflex, and it has a consequence: a framework that ships must
+  be executed, not merely compiled, so the test suite now runs one leg per target
+  framework.
+
+**This constrains 3.0.** Dropping a target framework is off the table for the same reason.
+A consolidation that breaks a locale file is a migration a maintainer performs once, with
+a mechanical diff and an empty-snapshot check to prove it; dropping a framework is a
+migration every consumer performs, for nothing they asked for. The two are not comparable
+and should not be bundled just because both are labelled "breaking".
 
 ## If it is done anyway
 
