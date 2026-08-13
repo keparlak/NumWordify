@@ -3,6 +3,36 @@
 All notable changes to this project are documented in this file.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [2.4.0] - 2026-08-14
+
+German, and the two settings it needed. Output for the six existing locales is unchanged.
+
+### Added
+
+- **`de-DE`**, the seventh shipped locale. Default currency EUR; also defines CHF and USD.
+  Range 10^18 - 1.
+- **`settings.onesBeforeTens`.** German reads the last two digits backwards:
+  `EINUNDZWANZIG`, "one and twenty". Only the order changes; the separator is still
+  `specialNumbers.compoundSeparator`.
+- **`settings.adjectiveScaleSeparator`.** German writes everything below a million as one
+  word and everything above it separately - `EINHUNDERTZWANZIGTAUSENDVIERHUNDERTNEUNZEHN`,
+  but `ZWEI MILLIONEN` with a space. That is the same split this library already calls
+  adjective and noun, so the setting applies only to adjective scale words; a noun always
+  takes a space.
+
+### Fixed
+
+- The README listed inverted word order, "such as German", as a limitation of the model.
+  It is not one any more.
+
+### Note on the architecture question
+
+2.2.0 measured Portuguese at two new concepts and 2.3.0 measured Russian at six. German
+cost two, and reused gender agreement unchanged - `EINE MILLION` needs exactly what
+`ОДНА ТЫСЯЧА` needed. Three points rather than two, and the curve is not the one the
+second point suggested: Russian is the outlier, not the trend. The design note is updated
+accordingly.
+
 ## [2.3.0] - 2026-08-13
 
 Russian, and the two mechanisms it needed. Output for the five existing locales is

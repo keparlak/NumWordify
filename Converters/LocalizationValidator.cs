@@ -62,6 +62,13 @@ internal static class LocalizationValidator
         if (settings.HundredsSeparator is null)
             throw Invalid(source, "'settings.hundredsSeparator' is null. Use an empty string instead.");
 
+        if (settings.AdjectiveScaleSeparator is null)
+        {
+            throw Invalid(source,
+                "'settings.adjectiveScaleSeparator' is null. Use an empty string instead — " +
+                "that is what a locale which writes scale words tight against the digits wants.");
+        }
+
         if (settings.DecimalPlaces is < 0 or > MaxDecimalPlaces)
         {
             throw Invalid(source,

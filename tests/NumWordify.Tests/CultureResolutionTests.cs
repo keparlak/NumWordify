@@ -33,9 +33,9 @@ public class CultureResolutionTests
     [Fact]
     public void An_unsupported_culture_lists_the_supported_ones()
     {
-        var exception = Assert.Throws<LocalizationNotFoundException>(() => 1m.ToWords("de-DE"));
+        var exception = Assert.Throws<LocalizationNotFoundException>(() => 1m.ToWords("ja-JP"));
 
-        Assert.Equal("de-DE", exception.Culture);
+        Assert.Equal("ja-JP", exception.Culture);
         Assert.Contains("en-US", exception.AvailableCultures);
         Assert.Contains("tr-TR", exception.Message, StringComparison.Ordinal);
     }
@@ -59,7 +59,7 @@ public class CultureResolutionTests
     [Theory]
     [InlineData("en-US", true)]
     [InlineData("tr", true)]
-    [InlineData("de-DE", false)]
+    [InlineData("ja-JP", false)]
     [InlineData("", false)]
     [InlineData(null, false)]
     public void Support_can_be_probed_without_catching_an_exception(string? culture, bool expected)
@@ -75,7 +75,7 @@ public class CultureResolutionTests
         // tr-TR-EUR is a currency variant, not a culture. Listing it invited callers to
         // treat "locale per currency" as the supported pattern.
         Assert.Equal(
-            ["en-US", "es-ES", "fr-FR", "pt-PT", "ru-RU", "tr-TR"],
+            ["de-DE", "en-US", "es-ES", "fr-FR", "pt-PT", "ru-RU", "tr-TR"],
             NumberToWordsConverter.SupportedCultures);
     }
 

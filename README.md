@@ -23,7 +23,7 @@ Every example on this page is asserted by a test in `tests/NumWordify.Tests`, in
 ## Features
 
 - Numbers to words, with or without currency
-- Six languages: English, Turkish, French, Spanish, Portuguese, Russian
+- Seven languages: English, Turkish, French, Spanish, Portuguese, Russian, German
 - Per-locale currency maps (`"EUR"`, `"USD"`, …) plus arbitrary custom currencies
 - Irregular number handling: teens, vigesimal forms (French 70–99), fused forms (Spanish 21–29), apocope (`UN MILLÓN`, `UN EURO`), plural scale words (`DEUX MILLIONS`), and the adjective/noun split that decides French `DEUX CENT MILLE` versus `DEUX CENTS MILLIONS`
 - Currency names that agree in number (`ONE DOLLAR` / `TWO DOLLARS`)
@@ -113,7 +113,7 @@ A culture that names no region at all (`"es"`) is not contradicting the locale, 
 
 ### Checking a culture before using it
 
-`CultureInfo.CurrentCulture` is whatever the machine is set to, and only six languages ship with the library. Resolving and naming a currency are two separate questions, so the guard answers both — `en-GB` resolves to the English number words, but their default currency is the US dollar, and the library will not print `DOLLARS` for a British amount:
+`CultureInfo.CurrentCulture` is whatever the machine is set to, and only seven languages ship with the library. Resolving and naming a currency are two separate questions, so the guard answers both — `en-GB` resolves to the English number words, but their default currency is the US dollar, and the library will not print `DOLLARS` for a British amount:
 
 ```csharp
 var machine = CultureInfo.CurrentCulture;
@@ -125,7 +125,7 @@ var culture = NumberToWordsConverter.IsCultureSupported(machine, out var currenc
 amount.ToWords(culture);
 
 NumberToWordsConverter.SupportedCultures;
-// ["en-US", "es-ES", "fr-FR", "pt-PT", "ru-RU", "tr-TR"]
+// ["de-DE", "en-US", "es-ES", "fr-FR", "pt-PT", "ru-RU", "tr-TR"]
 ```
 
 The single-argument `IsCultureSupported(culture)` answers only "do the number words resolve?", which is the right question for `ToWordsWithoutCurrency` and for supplying your own currency:
@@ -188,7 +188,7 @@ The largest convertible value is determined by the number of scale words a local
 
 | Locale | Scale words | Largest value |
 | --- | --- | --- |
-| `en-US`, `tr-TR`, `fr-FR` | 6 | 10^18 − 1 |
+| `en-US`, `tr-TR`, `fr-FR`, `de-DE` | 6 | 10^18 − 1 |
 | `es-ES`, `ru-RU` | 5 | 10^15 − 1 |
 | `pt-PT` | 3 | 10^9 − 1 |
 
@@ -217,6 +217,7 @@ Argument mistakes (`null` culture, `null` model, unknown currency code, empty cu
 | `es-ES` | Spanish | EUR | USD, MXN | `CIEN`/`CIENTO`, fused twenties, apocope, plural scale words, `de` before a currency name |
 | `pt-PT` | Portuguese | EUR | USD, BRL | `CEM`/`CENTO`, the `E` conjunction inside a group and — conditionally — before the last group, `de` before a currency name |
 | `ru-RU` | Russian | RUB | USD, EUR | Three grammatical numbers selected on the last digits, and numerals that agree in gender with the scale word or currency unit after them |
+| `de-DE` | German | EUR | CHF, USD | Inverted last two digits (`EINUNDZWANZIG`), everything below a million written as one word, `EINS`/`EIN`/`EINE` by what follows |
 | `pt-PT` | Portuguese | EUR | USD, BRL | `CEM`/`CENTO`, the `E` conjunction inside a group and — conditionally — before the last group, `de` before a currency name |
 
 `tr-TR-EUR` also ships, but is deprecated: it is excluded from `SupportedCultures`, is never chosen by language fallback, and resolves only when named exactly. Its output is identical to `ToWords("tr-TR", "EUR")`, which a test enforces. Use the currency code instead.
@@ -228,7 +229,7 @@ Argument mistakes (`null` culture, `null` model, unknown currency code, empty cu
 - **Portuguese** stops at 10^9 − 1. European Portuguese reads 10^9 as *mil milhões*, two words with the "um" dropped, and the scale table holds one word per step with no way to drop it — defining `MIL MILHÕES` would give "UM MIL MILHÕES" for 10^9 itself. The scale is left undefined rather than made wrong. Brazilian *bilhão* is a different value and would not be a fix.
 - **Arabic-style duals** are not expressible. `pluralRule` covers two families — `OneOther` and `EastSlavic` (`one`/`few`/`many`, selected on `n % 10` and `n % 100`, which also serves Ukrainian and Belarusian) — but there is no `Two` category, so Arabic needs one that does not exist yet. Adding a family is a code change, deliberately: a rule expressed in JSON could not be validated up front the way the rest of the schema is.
 - **French elision** (`d'euros`) is still not expressible, and plural categories did not help: elision depends on the sound of the following word, not on the count.
-- **Word order within a group** is fixed as hundreds → tens → ones. Languages that invert it, such as German "einundzwanzig", cannot be expressed without enumerating 21–99 in `specialNumbers.special`.
+- **Word order within a group** is hundreds → tens → ones, or hundreds → ones → tens with `settings.onesBeforeTens` for German. No locale needs a third order, but one that did could not express it.
 - **Ordinals** ("twenty-first") are out of scope.
 
 ## Custom localization
@@ -347,6 +348,8 @@ Then approve the snapshot: run the test suite with `NUMWORDIFY_APPROVE=1`, which
 | `useExactHundredsBeforeScale` | `true` | Whether `exactHundreds` also applies before an `Adjective` scale word. Before a `Noun` scale word the exact form is always used. Spanish `CIEN MIL` keeps it on; French `DEUX CENT MILLE` turns it off. |
 | `apocopateBeforeNoun` | `false` | Apply `specialBeforeScale` in front of a noun — a `Noun` scale word or a currency name (Spanish `UN MILLÓN`, `UN EURO`). |
 | `pluralRule` | `"OneOther"` | How a count selects a grammatical number. `"OneOther"` is two forms; `"EastSlavic"` is three, chosen on `n % 10` and `n % 100` (Russian, Ukrainian, Belarusian). |
+| `onesBeforeTens` | `false` | Read the last two digits backwards: German `EINUNDZWANZIG`, "one and twenty". The separator is still `compoundSeparator`. |
+| `adjectiveScaleSeparator` | `" "` | What goes on either side of an `Adjective` scale word. German sets `""`, which is what writes everything below a million as one word; a `Noun` scale word always takes a space. |
 | `nounScaleLinkWord` | — | Word inserted between the number and the currency name when the number ends in a `Noun` scale word (Spanish `UN MILLÓN DE EUROS`). |
 | `hundredsSeparator` | `" "` | What goes between the hundreds word and the rest of the same group (Portuguese `CENTO E VINTE`; Spanish leaves it a space, `CIENTO VEINTE`). |
 | `finalGroupSeparator` | — | What goes in front of the last group when that group is a single term — below one hundred, or a whole number of hundreds. The only setting whose effect depends on the value: Portuguese needs `MIL E OITOCENTOS` (1800) but `MIL OITOCENTOS E NOVENTA E DOIS` (1892). |

@@ -16,9 +16,18 @@ localization schema. It proposed a test: add languages and count what they cost.
 | --- | --- | --- |
 | `pt-PT` (2.2.0) | 2 | `hundredsSeparator`, `finalGroupSeparator` |
 | `ru-RU` (2.3.0) | 6 | plural categories and gender agreement, across 7 schema fields |
+| `de-DE` (2.4.0) | 2 | `onesBeforeTens`, `adjectiveScaleSeparator` — and gender agreement reused unchanged |
 
-The second row is the finding. Not the size — the direction. Every concept was **added**;
-none replaced anything, because the fields they generalise are published API.
+With only the first two rows this looked like an accelerating curve. The third says
+otherwise: **Russian is the outlier, not the trend.** It needed two whole mechanisms
+because it is the first locale with more than two grammatical numbers; German needed two
+settings and then reused Russian's gender agreement without touching it — `EINE MILLION`
+is exactly what `ОДНА ТЫСЯЧА` was. That is the "these are grammatical concepts, not
+per-language switches" hypothesis holding, on the second language to test it.
+
+So the finding is not that the schema grows quickly. It is the **direction**: every
+concept was *added*, and none replaced anything, because the fields they generalise are
+published API.
 
 A prediction attached to that review — that a plural-category selector would subsume
 `scalesPlural`, `majorSingular` and `minorSingular` and thereby *delete* complexity — is
