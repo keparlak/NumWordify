@@ -408,7 +408,10 @@ NumWordify/
 ├── Extensions/
 │   └── DecimalExtensions.cs         # Extension methods for decimal
 ├── Models/                          # Localization data model + WordifyOptions
-└── Resources/                       # en-US, tr-TR, tr-TR-EUR, fr-FR, es-ES
+└── Resources/                       # en-US, tr-TR, tr-TR-EUR, fr-FR, es-ES, pt-PT, ru-RU
+docs/
+└── word-forms-3.0.md                # Design note: why the schema has three ways to
+                                     # name a word form, and when to reduce it to one
 tests/
 └── NumWordify.Tests/
     ├── Approvals/                   # Full-output snapshots, one file per locale
