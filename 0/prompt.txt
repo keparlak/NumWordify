@@ -44,3 +44,11 @@ parallel[0] failed: parallel() expects an array of functions, not promises. Wrap
 parallel[1] failed: parallel() expects an array of functions, not promises. Wrap each call: () =&gt; agent(...)</failures>
 <usage><agent_count>23</agent_count><agents_done>23</agents_done><agents_error>0</agents_error><agents_skipped>0</agents_skipped><agents_empty_result>0</agents_empty_result><subagent_tokens>1655138</subagent_tokens><tool_uses>597</tool_uses><duration_ms>1838864</duration_ms></usage>
 </task-notification>
+
+---
+
+Merge et
+
+---
+
+Önerinle devam edelim
