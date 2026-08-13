@@ -52,3 +52,7 @@ Merge et
 ---
 
 Önerinle devam edelim
+
+---
+
+evet merge et izle doğruladıktan sonra devam edelim
