@@ -56,3 +56,11 @@ Merge et
 ---
 
 evet merge et izle doğruladıktan sonra devam edelim
+
+---
+
+Evet devam et
+
+---
+
+Önerinle devam edelim
