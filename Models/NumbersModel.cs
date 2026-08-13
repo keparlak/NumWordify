@@ -106,4 +106,17 @@ public class NumbersModel
     /// </remarks>
     [JsonPropertyName("scaleForms")]
     public Dictionary<PluralCategory, string[]>? ScaleForms { get; set; }
+
+    /// <summary>
+    /// Gets or sets the grammatical gender of each scale word, parallel to
+    /// <see cref="Scales"/>. Optional; every scale is treated as
+    /// <see cref="Gender.Masculine"/> when omitted. Index 0 is unused — the units group
+    /// has no scale word, and what follows it there is the currency.
+    /// </summary>
+    /// <remarks>
+    /// Only meaningful together with <see cref="SpecialNumbersModel.ByGender"/>, which
+    /// supplies the numeral forms to agree with.
+    /// </remarks>
+    [JsonPropertyName("scaleGenders")]
+    public Gender[]? ScaleGenders { get; set; }
 }

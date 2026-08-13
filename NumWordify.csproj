@@ -10,14 +10,14 @@
        git tag; the fallback below only applies to local builds. -->
   <PropertyGroup>
     <PackageId>NumWordify</PackageId>
-    <VersionPrefix Condition="'$(VersionPrefix)' == ''">2.2.0</VersionPrefix>
+    <VersionPrefix Condition="'$(VersionPrefix)' == ''">2.3.0</VersionPrefix>
     <Authors>Kadir Emre Parlak</Authors>
     <Company>keparlak</Company>
     <Product>NumWordify</Product>
     <Title>NumWordify - Number to Words Converter</Title>
     <Description>A .NET library for converting numbers to words with multi-language and multi-currency support.
 
-- Languages: English, Turkish, French, Spanish, Portuguese
+- Languages: English, Turkish, French, Spanish, Portuguese, Russian
 - Multi-currency, with per-locale currency maps and custom currency overrides
 - Irregular number handling: teens, vigesimal forms, apocope, plural scale words
 - Culture-based conversion from a culture code or CultureInfo
@@ -50,7 +50,7 @@
          weakens the check rather than failing it. It must always name a version that is
          actually on nuget.org, because restore downloads it. -->
     <EnablePackageValidation>true</EnablePackageValidation>
-    <PackageValidationBaselineVersion>2.1.0</PackageValidationBaselineVersion>
+    <PackageValidationBaselineVersion>2.2.0</PackageValidationBaselineVersion>
   </PropertyGroup>
 
   <!-- Source Link only has something to resolve on a real CI checkout; locally the

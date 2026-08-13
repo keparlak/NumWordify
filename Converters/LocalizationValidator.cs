@@ -46,6 +46,7 @@ internal static class LocalizationValidator
             ValidateDigitArray(numbers.ExactHundreds, "numbers.exactHundreds", source, allowEmptyEntries: true);
 
         ValidateScales(numbers, source);
+        ValidateScaleFormsAndGenders(numbers, source);
 
         var settings = localization.Settings
             ?? throw Invalid(source, "'settings' is missing.");
@@ -66,6 +67,13 @@ internal static class LocalizationValidator
             throw Invalid(source,
                 $"'settings.decimalPlaces' must be between 0 and {MaxDecimalPlaces}, " +
                 $"but is {settings.DecimalPlaces.ToString(CultureInfo.InvariantCulture)}.");
+        }
+
+        if (settings.PluralRule is not (PluralRule.OneOther or PluralRule.EastSlavic))
+        {
+            throw Invalid(source,
+                $"'settings.pluralRule' is {((int)settings.PluralRule).ToString(CultureInfo.InvariantCulture)}, " +
+                "which is not a plural rule. Use OneOther or EastSlavic.");
         }
 
         ValidateDecimalPlacesFitScales(numbers, settings, source);
@@ -118,6 +126,49 @@ internal static class LocalizationValidator
                 throw Invalid(source,
                     $"'numbers.scaleKinds[{i}]' is {((int)kinds[i]).ToString(CultureInfo.InvariantCulture)}, " +
                     "which is not a scale kind. Use Adjective or Noun.");
+            }
+        }
+    }
+
+    private static void ValidateScaleFormsAndGenders(NumbersModel numbers, string source)
+    {
+        if (numbers.ScaleForms is { } forms)
+        {
+            foreach (var pair in forms)
+            {
+                if (pair.Key is not (PluralCategory.Other or PluralCategory.One or PluralCategory.Few or PluralCategory.Many))
+                {
+                    throw Invalid(source,
+                        $"'numbers.scaleForms' is keyed by {((int)pair.Key).ToString(CultureInfo.InvariantCulture)}, " +
+                        "which is not a plural category. Use One, Few, Many or Other.");
+                }
+
+                if (pair.Value is null)
+                    throw Invalid(source, $"'numbers.scaleForms.{pair.Key}' is null. Omit the entry instead.");
+
+                // Indexed by scale inside the conversion loop, so a short array would
+                // throw there rather than here.
+                ValidateParallelToScales(pair.Value, $"numbers.scaleForms.{pair.Key}", numbers.Scales.Length, source);
+            }
+        }
+
+        if (numbers.ScaleGenders is not { } genders)
+            return;
+
+        if (genders.Length != numbers.Scales.Length)
+        {
+            throw Invalid(source,
+                $"'numbers.scaleGenders' must have the same length as 'numbers.scales' " +
+                $"({numbers.Scales.Length}), but has {genders.Length}.");
+        }
+
+        for (var i = 0; i < genders.Length; i++)
+        {
+            if (genders[i] is not (Gender.Masculine or Gender.Feminine or Gender.Neuter))
+            {
+                throw Invalid(source,
+                    $"'numbers.scaleGenders[{i}]' is {((int)genders[i]).ToString(CultureInfo.InvariantCulture)}, " +
+                    "which is not a gender. Use Masculine, Feminine or Neuter.");
             }
         }
     }
@@ -201,6 +252,21 @@ internal static class LocalizationValidator
         ValidateOverrides(special?.Special, "specialNumbers.special", source);
         ValidateOverrides(special?.SpecialBeforeScale, "specialNumbers.specialBeforeScale", source);
 
+        if (special?.ByGender is { } byGender)
+        {
+            foreach (var pair in byGender)
+            {
+                if (pair.Key is not (Gender.Masculine or Gender.Feminine or Gender.Neuter))
+                {
+                    throw Invalid(source,
+                        $"'specialNumbers.byGender' is keyed by {((int)pair.Key).ToString(CultureInfo.InvariantCulture)}, " +
+                        "which is not a gender. Use Masculine, Feminine or Neuter.");
+                }
+
+                ValidateOverrides(pair.Value, $"specialNumbers.byGender.{pair.Key}", source);
+            }
+        }
+
         if (special is not null && special.CompoundSeparator is null)
             throw Invalid(source, "'specialNumbers.compoundSeparator' is null. Use an empty string instead.");
     }
@@ -243,6 +309,38 @@ internal static class LocalizationValidator
 
         if (currency.Minor is null)
             throw Invalid(source, $"'{path}.minor' is null. Use an empty string instead.");
+
+        foreach (var gender in new[] { currency.MajorGender, currency.MinorGender })
+        {
+            if (gender is not (Gender.Masculine or Gender.Feminine or Gender.Neuter))
+            {
+                throw Invalid(source,
+                    $"'{path}' declares gender {((int)gender).ToString(CultureInfo.InvariantCulture)}, " +
+                    "which is not one. Use Masculine, Feminine or Neuter.");
+            }
+        }
+
+        ValidateForms(currency.MajorForms, $"{path}.majorForms", source);
+        ValidateForms(currency.MinorForms, $"{path}.minorForms", source);
+    }
+
+    private static void ValidateForms(Dictionary<PluralCategory, string>? forms, string path, string source)
+    {
+        if (forms is null)
+            return;
+
+        foreach (var pair in forms)
+        {
+            if (pair.Key is not (PluralCategory.Other or PluralCategory.One or PluralCategory.Few or PluralCategory.Many))
+            {
+                throw Invalid(source,
+                    $"'{path}' is keyed by {((int)pair.Key).ToString(CultureInfo.InvariantCulture)}, " +
+                    "which is not a plural category. Use One, Few, Many or Other.");
+            }
+
+            if (pair.Value is null)
+                throw Invalid(source, $"'{path}.{pair.Key}' is null. Omit the entry instead.");
+        }
     }
 
     private static void ValidateOverrides(Dictionary<int, string>? overrides, string path, string source)
