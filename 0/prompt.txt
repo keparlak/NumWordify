@@ -80,3 +80,7 @@ Merge et ama durmayacağız devam edeceğiz
 ---
 
 Merge et ve devam et
+
+---
+
+Merge et ve devam edelim
