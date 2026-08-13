@@ -76,3 +76,7 @@ Merge et yayınla sonrasında önerinle devam edelim
 ---
 
 Merge et ama durmayacağız devam edeceğiz
+
+---
+
+Merge et ve devam et
