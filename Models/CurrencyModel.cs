@@ -38,4 +38,34 @@ public class CurrencyModel
     /// </summary>
     [JsonPropertyName("minorSingular")]
     public string? MinorSingular { get; set; }
+
+    /// <summary>
+    /// Gets or sets the major unit per grammatical number, for locales whose plural rule
+    /// has more than two forms. Falls back to <see cref="MajorSingular"/> and
+    /// <see cref="Major"/>.
+    /// </summary>
+    [JsonPropertyName("majorForms")]
+    public Dictionary<PluralCategory, string>? MajorForms { get; set; }
+
+    /// <summary>
+    /// Gets or sets the minor unit per grammatical number. Falls back to
+    /// <see cref="MinorSingular"/> and <see cref="Minor"/>.
+    /// </summary>
+    [JsonPropertyName("minorForms")]
+    public Dictionary<PluralCategory, string>? MinorForms { get; set; }
+
+    /// <summary>
+    /// Gets or sets the grammatical gender of the major unit, for locales whose numerals
+    /// agree with it. Defaults to <see cref="Gender.Masculine"/>.
+    /// </summary>
+    [JsonPropertyName("majorGender")]
+    public Gender MajorGender { get; set; } = Gender.Masculine;
+
+    /// <summary>
+    /// Gets or sets the grammatical gender of the minor unit. Russian needs it: the
+    /// kopeck is feminine, so one of them is <c>ОДНА КОПЕЙКА</c> while one rouble is
+    /// <c>ОДИН РУБЛЬ</c>.
+    /// </summary>
+    [JsonPropertyName("minorGender")]
+    public Gender MinorGender { get; set; } = Gender.Masculine;
 }

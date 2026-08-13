@@ -341,7 +341,9 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
         var (isNegative, wholePart, fractionPart) = SplitNumberParts(number, settings.DecimalPlaces);
         var currencyFollows = currency is not null;
 
-        var wholeWords = ConvertWholeNumber(wholePart, number, currencyFollows, out var endsWithNounScale);
+        var wholeWords = ConvertWholeNumber(
+            wholePart, number, currencyFollows, currency?.MajorGender ?? Gender.Masculine,
+            out var endsWithNounScale);
         if (wholeWords.Length == 0)
         {
             wholeWords = settings.ZeroWord;
@@ -354,7 +356,8 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
 
         var fractionWords = readingMode == DecimalReadingMode.Digits
             ? ReadFractionDigits(fractionPart, settings.DecimalPlaces)
-            : ConvertWholeNumber(fractionPart, number, currencyFollows, out _);
+            : ConvertWholeNumber(
+                fractionPart, number, currencyFollows, currency?.MinorGender ?? Gender.Masculine, out _);
         if (fractionWords.Length == 0)
             fractionWords = settings.ZeroWord;
 
@@ -366,8 +369,8 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
             {
                 "whole" => wholeWords,
                 "decimal" => fractionWords,
-                "major" => currency is null ? string.Empty : Inflect(currency.Major, currency.MajorSingular, wholePart),
-                "minor" => currency is null ? string.Empty : Inflect(currency.Minor, currency.MinorSingular, fractionPart),
+                "major" => currency is null ? string.Empty : Inflect(currency.Major, currency.MajorSingular, currency.MajorForms, wholePart),
+                "minor" => currency is null ? string.Empty : Inflect(currency.Minor, currency.MinorSingular, currency.MinorForms, fractionPart),
                 _ => match.Value,
             };
 
@@ -384,8 +387,44 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
             : settings.NegativeWord + " " + result;
     }
 
-    private static string Inflect(string plural, string? singular, decimal value) =>
-        value == 1m && !string.IsNullOrEmpty(singular) ? singular! : plural;
+    private string Inflect(string plural, string? singular, Dictionary<PluralCategory, string>? forms, decimal value)
+    {
+        var category = CategoryOf(value);
+
+        if (forms is not null && forms.TryGetValue(category, out var word) && word.Length > 0)
+            return word;
+
+        return category == PluralCategory.One && !string.IsNullOrEmpty(singular) ? singular! : plural;
+    }
+
+    /// <summary>
+    /// The grammatical number the given count selects, under the locale's plural rule.
+    /// </summary>
+    private PluralCategory CategoryOf(decimal count) => _localization.Settings.PluralRule switch
+    {
+        PluralRule.EastSlavic => EastSlavicCategory(count),
+        _ => count == 1m ? PluralCategory.One : PluralCategory.Other,
+    };
+
+    // CLDR's rule for ru/uk/be. A fraction is always "other" — no Slavic language
+    // inflects a noun after "две целых пять десятых" the way it does after a whole two.
+    private static PluralCategory EastSlavicCategory(decimal count)
+    {
+        var value = Math.Abs(count);
+
+        if (value != Math.Floor(value))
+            return PluralCategory.Other;
+
+        var lastTwo = (long)(value % 100m);
+        var last = lastTwo % 10;
+
+        if (last == 1 && lastTwo != 11)
+            return PluralCategory.One;
+
+        return last is >= 2 and <= 4 && lastTwo is < 12 or > 14
+            ? PluralCategory.Few
+            : PluralCategory.Many;
+    }
 
     private ScaleKind KindOf(int scale)
     {
@@ -397,6 +436,7 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
         decimal value,
         decimal originalNumber,
         bool currencyFollows,
+        Gender currencyGender,
         out bool endsWithNounScale)
     {
         endsWithNounScale = false;
@@ -422,7 +462,11 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
                 var scaleIsNoun = scale > 0 && KindOf(scale) == ScaleKind.Noun;
                 var followedByNoun = scale > 0 ? scaleIsNoun : currencyFollows;
 
-                var text = ConvertGroup(group, scale, followedByNoun);
+                // A numeral agrees with the word after it, which is the scale word
+                // when there is one and the currency unit otherwise.
+                var followingGender = scale > 0 ? GenderOf(scale) : currencyGender;
+
+                var text = ConvertGroup(group, scale, followedByNoun, followingGender);
                 if (scale > 0)
                 {
                     var scaleWord = ScaleWord(scale, group);
@@ -470,14 +514,24 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
     private string ScaleWord(int scale, int group)
     {
         var numbers = _localization.Numbers!;
+        var category = CategoryOf(group);
 
-        if (group > 1 && numbers.ScalesPlural is { } plural && plural[scale].Length > 0)
+        if (numbers.ScaleForms is { } forms &&
+            forms.TryGetValue(category, out var words) &&
+            words[scale].Length > 0)
+        {
+            return words[scale];
+        }
+
+        // 'scales' is the One form and 'scalesPlural' the Other one, which is the same
+        // statement in two words for a locale that only has two.
+        if (category != PluralCategory.One && numbers.ScalesPlural is { } plural && plural[scale].Length > 0)
             return plural[scale];
 
         return numbers.Scales[scale];
     }
 
-    private string ConvertGroup(int number, int scale, bool followedByNoun)
+    private string ConvertGroup(int number, int scale, bool followedByNoun, Gender followingGender)
     {
         var hundreds = number / 100;
         var remainder = number % 100;
@@ -490,7 +544,7 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
         // which is why the override maps are never consulted with a key of 0.
         if (remainder > 0)
         {
-            var word = TensAndOnesWord(remainder, number, scale, followedByNoun);
+            var word = TensAndOnesWord(remainder, number, scale, followedByNoun, followingGender);
             if (word.Length > 0)
                 parts.Add(word);
         }
@@ -522,9 +576,15 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
     /// general override wins over the teens table, and regular construction is the
     /// fallback.
     /// </summary>
-    private string TensAndOnesWord(int remainder, int groupValue, int scale, bool followedByNoun)
+    private string TensAndOnesWord(
+        int remainder,
+        int groupValue,
+        int scale,
+        bool followedByNoun,
+        Gender followingGender)
     {
         return DropOneBeforeThousand(remainder, groupValue, scale)
+            ?? GenderedOverride(remainder, scale, followedByNoun, followingGender)
             ?? OverrideBeforeFollowingWord(remainder, scale, followedByNoun)
             ?? GeneralOverride(remainder)
             ?? Teen(remainder)
@@ -536,6 +596,31 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
         scale == 1 && groupValue == 1 && remainder == 1 && _localization.Settings.SkipOneForThousand
             ? string.Empty
             : null;
+
+    /// <summary>
+    /// The form that agrees with the gender of the following word. Russian has
+    /// ОДНА ТЫСЯЧА but ОДИН МИЛЛИОН — the same digit in front of a feminine and a
+    /// masculine noun.
+    /// </summary>
+    private string? GenderedOverride(int remainder, int scale, bool followedByNoun, Gender followingGender)
+    {
+        // Nothing follows the units group of a plain number, so there is nothing to agree
+        // with; the locale's uninflected form stands.
+        if (scale == 0 && !followedByNoun)
+            return null;
+
+        return _localization.SpecialNumbers?.ByGender is { } byGender &&
+               byGender.TryGetValue(followingGender, out var forms) &&
+               forms.TryGetValue(remainder, out var word)
+            ? word
+            : null;
+    }
+
+    private Gender GenderOf(int scale)
+    {
+        var genders = _localization.Numbers!.ScaleGenders;
+        return genders is not null && scale < genders.Length ? genders[scale] : Gender.Masculine;
+    }
 
     private string? OverrideBeforeFollowingWord(int remainder, int scale, bool followedByNoun)
     {

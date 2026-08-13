@@ -49,4 +49,18 @@ public class SpecialNumbersModel
     /// </summary>
     [JsonPropertyName("compoundSeparator")]
     public string CompoundSeparator { get; set; } = " ";
+
+    /// <summary>
+    /// Gets or sets numeral forms that agree with the gender of the word they stand in
+    /// front of, keyed by gender and then by the last two digits of the group.
+    /// </summary>
+    /// <remarks>
+    /// Russian inflects one and two: <c>ОДНА ТЫСЯЧА</c> and <c>ДВЕ ТЫСЯЧИ</c> because the
+    /// thousand is feminine, but <c>ОДИН МИЛЛИОН</c> and <c>ДВА МИЛЛИОНА</c> because the
+    /// million is not. Consulted before <see cref="SpecialBeforeScale"/>, and only when
+    /// the following word has a declared gender — so a locale that sets neither
+    /// <see cref="NumbersModel.ScaleGenders"/> nor a currency gender is unaffected.
+    /// </remarks>
+    [JsonPropertyName("byGender")]
+    public Dictionary<Gender, Dictionary<int, string>>? ByGender { get; set; }
 }

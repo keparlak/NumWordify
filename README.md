@@ -23,7 +23,7 @@ Every example on this page is asserted by a test in `tests/NumWordify.Tests`, in
 ## Features
 
 - Numbers to words, with or without currency
-- Five languages: English, Turkish, French, Spanish, Portuguese
+- Six languages: English, Turkish, French, Spanish, Portuguese, Russian
 - Per-locale currency maps (`"EUR"`, `"USD"`, …) plus arbitrary custom currencies
 - Irregular number handling: teens, vigesimal forms (French 70–99), fused forms (Spanish 21–29), apocope (`UN MILLÓN`, `UN EURO`), plural scale words (`DEUX MILLIONS`), and the adjective/noun split that decides French `DEUX CENT MILLE` versus `DEUX CENTS MILLIONS`
 - Currency names that agree in number (`ONE DOLLAR` / `TWO DOLLARS`)
@@ -113,7 +113,7 @@ A culture that names no region at all (`"es"`) is not contradicting the locale, 
 
 ### Checking a culture before using it
 
-`CultureInfo.CurrentCulture` is whatever the machine is set to, and only five languages ship with the library. Resolving and naming a currency are two separate questions, so the guard answers both — `en-GB` resolves to the English number words, but their default currency is the US dollar, and the library will not print `DOLLARS` for a British amount:
+`CultureInfo.CurrentCulture` is whatever the machine is set to, and only six languages ship with the library. Resolving and naming a currency are two separate questions, so the guard answers both — `en-GB` resolves to the English number words, but their default currency is the US dollar, and the library will not print `DOLLARS` for a British amount:
 
 ```csharp
 var machine = CultureInfo.CurrentCulture;
@@ -125,7 +125,7 @@ var culture = NumberToWordsConverter.IsCultureSupported(machine, out var currenc
 amount.ToWords(culture);
 
 NumberToWordsConverter.SupportedCultures;
-// ["en-US", "es-ES", "fr-FR", "pt-PT", "tr-TR"]
+// ["en-US", "es-ES", "fr-FR", "pt-PT", "ru-RU", "tr-TR"]
 ```
 
 The single-argument `IsCultureSupported(culture)` answers only "do the number words resolve?", which is the right question for `ToWordsWithoutCurrency` and for supplying your own currency:
@@ -189,7 +189,7 @@ The largest convertible value is determined by the number of scale words a local
 | Locale | Scale words | Largest value |
 | --- | --- | --- |
 | `en-US`, `tr-TR`, `fr-FR` | 6 | 10^18 − 1 |
-| `es-ES` | 5 | 10^15 − 1 |
+| `es-ES`, `ru-RU` | 5 | 10^15 − 1 |
 | `pt-PT` | 3 | 10^9 − 1 |
 
 Spanish and Portuguese stop earlier because their next scale has no single-word name — see [Known limitations](#known-limitations). Anything larger, including `decimal.MaxValue`, throws `NumberOutOfRangeException` rather than producing a wrong answer.
@@ -216,6 +216,7 @@ Argument mistakes (`null` culture, `null` model, unknown currency code, empty cu
 | `fr-FR` | French | EUR | USD, CHF | 70–99 vigesimal forms, `cent`/`vingt` plural including the adjective/noun split, plural scale words |
 | `es-ES` | Spanish | EUR | USD, MXN | `CIEN`/`CIENTO`, fused twenties, apocope, plural scale words, `de` before a currency name |
 | `pt-PT` | Portuguese | EUR | USD, BRL | `CEM`/`CENTO`, the `E` conjunction inside a group and — conditionally — before the last group, `de` before a currency name |
+| `ru-RU` | Russian | RUB | USD, EUR | Three grammatical numbers selected on the last digits, and numerals that agree in gender with the scale word or currency unit after them |
 | `pt-PT` | Portuguese | EUR | USD, BRL | `CEM`/`CENTO`, the `E` conjunction inside a group and — conditionally — before the last group, `de` before a currency name |
 
 `tr-TR-EUR` also ships, but is deprecated: it is excluded from `SupportedCultures`, is never chosen by language fallback, and resolves only when named exactly. Its output is identical to `ToWords("tr-TR", "EUR")`, which a test enforces. Use the currency code instead.
@@ -225,7 +226,8 @@ Argument mistakes (`null` culture, `null` model, unknown currency code, empty cu
 - **French** does not insert `de` / `d'` between a noun scale word and a currency name: `1_000_000M.ToWords("fr-FR")` yields "UN MILLION EUROS" where correct French is "un million d'euros". The elision depends on the following word, which the template model cannot express. Supply your own `currencyFormat`, or post-process, if you need it. Spanish, where no elision occurs, is handled: "UN MILLÓN DE EUROS".
 - **Spanish** stops at 10^15 − 1. `MILLARDO` (10^9) is accepted by the RAE but uncommon — "mil millones" is the usual form and cannot be expressed as a single scale word here. 10^15 has no accepted single word at all, so the scale is not defined rather than invented. Gender agreement (`DOSCIENTAS`) is not modelled.
 - **Portuguese** stops at 10^9 − 1. European Portuguese reads 10^9 as *mil milhões*, two words with the "um" dropped, and the scale table holds one word per step with no way to drop it — defining `MIL MILHÕES` would give "UM MIL MILHÕES" for 10^9 itself. The scale is left undefined rather than made wrong. Brazilian *bilhão* is a different value and would not be a fix.
-- **Currency names** distinguish only "one" from "not one", and the choice is made in code rather than in the locale file. Languages whose plural rules need more categories — Russian and Polish (`one`/`few`/`many`, selected on `n % 10` and `n % 100`), Arabic (which adds a dual) — cannot be expressed here, and no custom localization works around it. The same missing concept is what blocks French elision above.
+- **Arabic-style duals** are not expressible. `pluralRule` covers two families — `OneOther` and `EastSlavic` (`one`/`few`/`many`, selected on `n % 10` and `n % 100`, which also serves Ukrainian and Belarusian) — but there is no `Two` category, so Arabic needs one that does not exist yet. Adding a family is a code change, deliberately: a rule expressed in JSON could not be validated up front the way the rest of the schema is.
+- **French elision** (`d'euros`) is still not expressible, and plural categories did not help: elision depends on the sound of the following word, not on the count.
 - **Word order within a group** is fixed as hundreds → tens → ones. Languages that invert it, such as German "einundzwanzig", cannot be expressed without enumerating 21–99 in `specialNumbers.special`.
 - **Ordinals** ("twenty-first") are out of scope.
 
@@ -333,6 +335,8 @@ Then approve the snapshot: run the test suite with `NUMWORDIFY_APPROVE=1`, which
 | `scales` | yes | Index 0 is the units group, 1 the thousands, and so on. Index 0 must be empty; every other entry must have a value. Length caps the convertible range at 10^(3 × length) − 1. |
 | `scalesPlural` | no | Scale words used when the preceding group is greater than one (`DEUX MILLIONS`). Same length as `scales`; empty entries fall back. |
 | `scaleKinds` | no | `"Adjective"` or `"Noun"` per scale word, same length as `scales`. Defaults to all `Adjective`. This is what distinguishes French `DEUX CENT MILLE` from `DEUX CENTS MILLIONS`. |
+| `scaleForms` | no | Scale words per grammatical number, keyed `"One"`, `"Few"`, `"Many"`, `"Other"`, each array the same length as `scales`. Only for locales whose `pluralRule` has more than two forms — Russian `ТЫСЯЧА` / `ТЫСЯЧИ` / `ТЫСЯЧ`. Empty entries fall back to `scalesPlural`, then `scales`. |
+| `scaleGenders` | no | `"Masculine"`, `"Feminine"` or `"Neuter"` per scale word, same length as `scales`. Defaults to all masculine. Only meaningful with `specialNumbers.byGender`. |
 
 `settings`
 
@@ -342,6 +346,7 @@ Then approve the snapshot: run the test suite with `NUMWORDIFY_APPROVE=1`, which
 | `useTeens` | auto | Use `specialNumbers.teens` for 11–19. Left unset it turns itself on whenever `teens` is supplied. |
 | `useExactHundredsBeforeScale` | `true` | Whether `exactHundreds` also applies before an `Adjective` scale word. Before a `Noun` scale word the exact form is always used. Spanish `CIEN MIL` keeps it on; French `DEUX CENT MILLE` turns it off. |
 | `apocopateBeforeNoun` | `false` | Apply `specialBeforeScale` in front of a noun — a `Noun` scale word or a currency name (Spanish `UN MILLÓN`, `UN EURO`). |
+| `pluralRule` | `"OneOther"` | How a count selects a grammatical number. `"OneOther"` is two forms; `"EastSlavic"` is three, chosen on `n % 10` and `n % 100` (Russian, Ukrainian, Belarusian). |
 | `nounScaleLinkWord` | — | Word inserted between the number and the currency name when the number ends in a `Noun` scale word (Spanish `UN MILLÓN DE EUROS`). |
 | `hundredsSeparator` | `" "` | What goes between the hundreds word and the rest of the same group (Portuguese `CENTO E VINTE`; Spanish leaves it a space, `CIENTO VEINTE`). |
 | `finalGroupSeparator` | — | What goes in front of the last group when that group is a single term — below one hundred, or a whole number of hundreds. The only setting whose effect depends on the value: Portuguese needs `MIL E OITOCENTOS` (1800) but `MIL OITOCENTOS E NOVENTA E DOIS` (1892). |
@@ -358,6 +363,7 @@ Then approve the snapshot: run the test suite with `NUMWORDIFY_APPROVE=1`, which
 | `teens` | Exactly nine entries, for 11 through 19. |
 | `special` | Whole-word overrides for the last two digits of a group, keyed 1–99. This is where French 70–99 and Spanish 21–29 live. |
 | `specialBeforeScale` | Overrides that apply in front of an `Adjective` scale word, and — with `apocopateBeforeNoun` — in front of a noun. |
+| `byGender` | Numeral forms that agree with the gender of the word they stand in front of, keyed by gender and then by the last two digits. Russian `ОДНА ТЫСЯЧА` but `ОДИН МИЛЛИОН`. Consulted before `specialBeforeScale`, and only when the following word declares a gender. |
 | `compoundSeparator` | Placed between the tens and ones word. `"-"` for English, `" Y "` for Spanish, `" "` (the default) for Turkish. |
 
 Top level

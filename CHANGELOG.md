@@ -3,6 +3,50 @@
 All notable changes to this project are documented in this file.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [2.3.0] - 2026-08-13
+
+Russian, and the two mechanisms it needed. Output for the five existing locales is
+unchanged — their approved snapshots are byte-identical.
+
+### Added
+
+- **`ru-RU`**, the sixth shipped locale. Default currency RUB; also defines USD and EUR.
+- **Grammatical number beyond singular and plural.** `settings.pluralRule` selects the
+  family (`OneOther`, the default, or `EastSlavic` for Russian, Ukrainian and Belarusian),
+  and `numbers.scaleForms` plus `currencies.*.majorForms`/`minorForms` carry the words:
+  `ОДИН РУБЛЬ`, `ДВА РУБЛЯ`, `ПЯТЬ РУБЛЕЙ`. A rule is code rather than data on purpose —
+  `n % 10 == 1 and n % 100 != 11` expressed in JSON would make the locale file a small
+  programming language, which cannot be validated up front the way the rest of the schema
+  is.
+- **Gender agreement.** A numeral agrees with the word after it, which is a scale word or
+  a currency unit. `numbers.scaleGenders` and `currencies.*.majorGender`/`minorGender`
+  declare the gender; `specialNumbers.byGender` supplies the forms. Russian needs it in
+  both places at once: `ОДИН РУБЛЬ ОДНА КОПЕЙКА` — the rouble is masculine, the kopeck is
+  feminine, and the same digit reads differently in the same sentence.
+
+### Changed
+
+- `settings.pluralRule` is honoured wherever a word was previously chosen by
+  "equals one or not". `OneOther` reproduces that exactly, which is why nothing changed
+  for the other five locales.
+
+### Known limitations
+
+- Arabic-style duals are still not expressible: there is no `Two` category. Adding a
+  plural-rule family is a code change by design.
+- French `d'euros` elision is still not expressible, and plural categories did not help.
+  A review had predicted they would; they do not, because elision depends on the sound of
+  the following word rather than on the count.
+
+### Note on the architecture question
+
+2.2.0 recorded that Portuguese cost two new concepts. Russian cost six, of which the
+schema carries seven new fields. More importantly the growth is one-way: `scalesPlural`,
+`majorSingular` and `minorSingular` are now special cases of the general mechanism and
+could be expressed through it, but they are published API and stay. The measurement is
+`+63 / -3` lines for the plural half alone. The next language should be designed against
+a model that can drop the old fields, which means a major version.
+
 ## [2.2.0] - 2026-08-13
 
 European Portuguese, and the two schema concepts it turned out to need. Output for the
