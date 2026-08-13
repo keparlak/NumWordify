@@ -1,11 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- net48 consumes the netstandard2.0 build, so the oldest target is exercised at
-         runtime and not only at compile time. Windows-only, since it needs the .NET
-         Framework reference assemblies. -->
-    <TargetFrameworks>net9.0;net8.0</TargetFrameworks>
-    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('Windows'))">net9.0;net8.0;net48</TargetFrameworks>
+    <!-- One leg per shipped target framework, so nothing is compiled without also being
+         run. net6.0 and net7.0 are out of support upstream but stay in the library, so
+         they are tested rather than merely built. net48 consumes the netstandard2.0
+         build, which is how the oldest target gets exercised at runtime; it is
+         Windows-only because it needs the .NET Framework reference assemblies.
+
+         Both lines below have to list the same frameworks: the conditional one replaces
+         the first on Windows rather than adding to it, so editing only one of them is a
+         silent no-op on half the matrix. -->
+    <TargetFrameworks>net9.0;net8.0;net7.0;net6.0</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('Windows'))">net9.0;net8.0;net7.0;net6.0;net48</TargetFrameworks>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
