@@ -339,16 +339,15 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
     {
         var settings = _localization.Settings;
         var (isNegative, wholePart, fractionPart) = SplitNumberParts(number, settings.DecimalPlaces);
-        var currencyFollows = currency is not null;
+        var afterWhole = Following.Of(currency?.MajorGender);
+        var afterFraction = Following.Of(currency?.MinorGender);
 
-        var wholeWords = ConvertWholeNumber(
-            wholePart, number, currencyFollows, currency?.MajorGender ?? Gender.Masculine,
-            out var endsWithNounScale);
+        var (wholeWords, endsWithNounScale) = ConvertWholeNumber(wholePart, number, afterWhole);
         if (wholeWords.Length == 0)
         {
             wholeWords = settings.ZeroWord;
         }
-        else if (currencyFollows && endsWithNounScale && !string.IsNullOrEmpty(settings.NounScaleLinkWord))
+        else if (currency is not null && endsWithNounScale && !string.IsNullOrEmpty(settings.NounScaleLinkWord))
         {
             // "UN MILLÓN DE EUROS", but "UN MILLÓN QUINIENTOS MIL EUROS".
             wholeWords += " " + settings.NounScaleLinkWord;
@@ -356,8 +355,7 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
 
         var fractionWords = readingMode == DecimalReadingMode.Digits
             ? ReadFractionDigits(fractionPart, settings.DecimalPlaces)
-            : ConvertWholeNumber(
-                fractionPart, number, currencyFollows, currency?.MinorGender ?? Gender.Masculine, out _);
+            : ConvertWholeNumber(fractionPart, number, afterFraction).Words;
         if (fractionWords.Length == 0)
             fractionWords = settings.ZeroWord;
 
@@ -432,17 +430,13 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
         return kinds is not null && scale < kinds.Length ? kinds[scale] : ScaleKind.Adjective;
     }
 
-    private string ConvertWholeNumber(
+    private (string Words, bool EndsWithNounScale) ConvertWholeNumber(
         decimal value,
         decimal originalNumber,
-        bool currencyFollows,
-        Gender currencyGender,
-        out bool endsWithNounScale)
+        Following afterNumber)
     {
-        endsWithNounScale = false;
-
         if (value == 0m)
-            return string.Empty;
+            return (string.Empty, false);
 
         var scales = _localization.Numbers!.Scales;
         var groups = new List<string>();
@@ -450,6 +444,7 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
         var scale = 0;
         var isLowestGroup = true;
         var lowestGroup = 0;
+        var endsWithNounScale = false;
 
         while (remaining > 0m)
         {
@@ -459,14 +454,14 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
                 if (scale >= scales.Length)
                     throw new NumberOutOfRangeException(originalNumber, scales.Length);
 
-                var scaleIsNoun = scale > 0 && KindOf(scale) == ScaleKind.Noun;
-                var followedByNoun = scale > 0 ? scaleIsNoun : currencyFollows;
+                // What comes after this group is the scale word when there is one,
+                // and whatever the number as a whole is followed by otherwise. Asked
+                // once here rather than re-derived by each rule that depends on it.
+                var following = scale > 0
+                    ? Following.Scale(KindOf(scale), GenderOf(scale))
+                    : afterNumber;
 
-                // A numeral agrees with the word after it, which is the scale word
-                // when there is one and the currency unit otherwise.
-                var followingGender = scale > 0 ? GenderOf(scale) : currencyGender;
-
-                var text = ConvertGroup(group, scale, followedByNoun, followingGender);
+                var text = ConvertGroup(group, scale, following);
                 if (scale > 0)
                 {
                     var scaleWord = ScaleWord(scale, group);
@@ -478,7 +473,10 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
 
                 if (isLowestGroup)
                 {
-                    endsWithNounScale = scaleIsNoun;
+                    // A currency is a noun but not a noun *scale word*, so the units
+                    // group never ends the number in one. This is the one place where
+                    // "what follows" and "what this group ends in" part company.
+                    endsWithNounScale = scale > 0 && following.IsNoun;
                     lowestGroup = group;
                     isLowestGroup = false;
                 }
@@ -488,7 +486,7 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
             scale++;
         }
 
-        return JoinGroups(groups, lowestGroup);
+        return (JoinGroups(groups, lowestGroup), endsWithNounScale);
     }
 
     /// <summary>
@@ -531,20 +529,20 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
         return numbers.Scales[scale];
     }
 
-    private string ConvertGroup(int number, int scale, bool followedByNoun, Gender followingGender)
+    private string ConvertGroup(int number, int scale, Following following)
     {
         var hundreds = number / 100;
         var remainder = number % 100;
         var parts = new List<string>(2);
 
         if (hundreds > 0)
-            parts.Add(HundredsWord(hundreds, remainder, scale));
+            parts.Add(HundredsWord(hundreds, remainder, following));
 
         // A group whose last two digits are zero contributes no tens/ones word at all,
         // which is why the override maps are never consulted with a key of 0.
         if (remainder > 0)
         {
-            var word = TensAndOnesWord(remainder, number, scale, followedByNoun, followingGender);
+            var word = TensAndOnesWord(remainder, number, scale, following);
             if (word.Length > 0)
                 parts.Add(word);
         }
@@ -552,15 +550,16 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
         return string.Join(_localization.Settings.HundredsSeparator, parts);
     }
 
-    private string HundredsWord(int hundreds, int remainder, int scale)
+    private string HundredsWord(int hundreds, int remainder, Following following)
     {
         var numbers = _localization.Numbers!;
 
         if (remainder == 0 && numbers.ExactHundreds is { } exact && exact[hundreds].Length > 0)
         {
-            // A noun scale word ends the numeral phrase, so French keeps the plural in
-            // "DEUX CENTS MILLIONS" but drops it in "DEUX CENT MILLE".
-            var endsNumeralPhrase = scale == 0 || KindOf(scale) == ScaleKind.Noun;
+            // Only another numeral adjective continues the numeral phrase, which is
+            // why French keeps the plural in "DEUX CENTS MILLIONS" but drops it in
+            // "DEUX CENT MILLE".
+            var endsNumeralPhrase = following.Kind != FollowingKind.NumeralAdjective;
 
             if (endsNumeralPhrase || _localization.Settings.UseExactHundredsBeforeScale)
                 return exact[hundreds];
@@ -576,16 +575,11 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
     /// general override wins over the teens table, and regular construction is the
     /// fallback.
     /// </summary>
-    private string TensAndOnesWord(
-        int remainder,
-        int groupValue,
-        int scale,
-        bool followedByNoun,
-        Gender followingGender)
+    private string TensAndOnesWord(int remainder, int groupValue, int scale, Following following)
     {
         return DropOneBeforeThousand(remainder, groupValue, scale)
-            ?? GenderedOverride(remainder, scale, followedByNoun, followingGender)
-            ?? OverrideBeforeFollowingWord(remainder, scale, followedByNoun)
+            ?? GenderedOverride(remainder, following)
+            ?? OverrideBeforeFollowingWord(remainder, following)
             ?? GeneralOverride(remainder)
             ?? Teen(remainder)
             ?? Regular(remainder);
@@ -602,18 +596,61 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
     /// ОДНА ТЫСЯЧА but ОДИН МИЛЛИОН — the same digit in front of a feminine and a
     /// masculine noun.
     /// </summary>
-    private string? GenderedOverride(int remainder, int scale, bool followedByNoun, Gender followingGender)
+    private string? GenderedOverride(int remainder, Following following)
     {
         // Nothing follows the units group of a plain number, so there is nothing to agree
         // with; the locale's uninflected form stands.
-        if (scale == 0 && !followedByNoun)
+        if (following.Kind == FollowingKind.Nothing)
             return null;
 
         return _localization.SpecialNumbers?.ByGender is { } byGender &&
-               byGender.TryGetValue(followingGender, out var forms) &&
+               byGender.TryGetValue(following.Gender, out var forms) &&
                forms.TryGetValue(remainder, out var word)
             ? word
             : null;
+    }
+
+    /// <summary>What stands immediately after a group of digits.</summary>
+    private enum FollowingKind
+    {
+        /// <summary>Nothing: the number ends here.</summary>
+        Nothing,
+
+        /// <summary>A scale word that behaves as a numeral adjective, such as MILLE.</summary>
+        NumeralAdjective,
+
+        /// <summary>A noun: a scale word such as MILLION, or a currency name.</summary>
+        Noun,
+    }
+
+    /// <summary>
+    /// The word after a group, as everything downstream needs to know it. Four rules
+    /// depend on this one question - the exact-hundreds form, the two override tables and
+    /// gender agreement - and each used to re-derive its own answer from the scale index.
+    /// </summary>
+    private readonly struct Following
+    {
+        private Following(FollowingKind kind, Gender gender)
+        {
+            Kind = kind;
+            Gender = gender;
+        }
+
+        public FollowingKind Kind { get; }
+
+        public Gender Gender { get; }
+
+        public bool IsNoun => Kind == FollowingKind.Noun;
+
+        /// <summary>A currency name when there is one, nothing when there is not.</summary>
+        public static Following Of(Gender? currencyGender) =>
+            currencyGender is { } gender
+                ? new Following(FollowingKind.Noun, gender)
+                : new Following(FollowingKind.Nothing, Gender.Masculine);
+
+        public static Following Scale(ScaleKind kind, Gender gender) => new(
+            kind == ScaleKind.Noun ? FollowingKind.Noun : FollowingKind.NumeralAdjective,
+            gender);
     }
 
     private Gender GenderOf(int scale)
@@ -622,7 +659,7 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
         return genders is not null && scale < genders.Length ? genders[scale] : Gender.Masculine;
     }
 
-    private string? OverrideBeforeFollowingWord(int remainder, int scale, bool followedByNoun)
+    private string? OverrideBeforeFollowingWord(int remainder, Following following)
     {
         if (_localization.SpecialNumbers?.SpecialBeforeScale is not { } overrides)
             return null;
@@ -630,8 +667,8 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
         // French drops the plural of "vingt" only before a numeral adjective, Spanish
         // apocopates only before a noun. Both are "before a following word", but they
         // pick opposite sides of that split.
-        var beforeNumeralAdjective = scale > 0 && KindOf(scale) == ScaleKind.Adjective;
-        var beforeNoun = followedByNoun && _localization.Settings.ApocopateBeforeNoun;
+        var beforeNumeralAdjective = following.Kind == FollowingKind.NumeralAdjective;
+        var beforeNoun = following.IsNoun && _localization.Settings.ApocopateBeforeNoun;
 
         if (!beforeNumeralAdjective && !beforeNoun)
             return null;

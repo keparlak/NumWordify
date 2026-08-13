@@ -109,6 +109,20 @@ public class GrammarSettingsTests
     }
 
     [Fact]
+    public void The_link_word_is_left_out_when_the_currency_follows_the_units_group()
+    {
+        // A currency name is a noun, but it is not a noun *scale word*, and the link word
+        // belongs only to the second. The units group is the one place those two
+        // questions give different answers — which is why a refactor that treated them as
+        // one produced "ONE OF DOLLAR" and had to be rejected.
+        var locale = TestLocalizations.GrammarProbe([ScaleKind.Adjective, ScaleKind.Noun, ScaleKind.Noun]);
+        locale.Settings.NounScaleLinkWord = "OF";
+
+        Assert.Equal("ONE DOLLAR ZERO CENTS", 1m.ToWords(locale));
+        Assert.Equal("TWENTY-ONE DOLLARS ZERO CENTS", 21m.ToWords(locale));
+    }
+
+    [Fact]
     public void A_noun_scale_without_a_link_word_joins_the_currency_directly()
     {
         var locale = TestLocalizations.GrammarProbe([ScaleKind.Adjective, ScaleKind.Noun, ScaleKind.Noun]);
