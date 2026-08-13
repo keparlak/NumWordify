@@ -68,3 +68,7 @@ Evet devam et
 ---
 
 Önerinle devam edelim
+
+---
+
+Merge et yayınla sonrasında önerinle devam edelim
