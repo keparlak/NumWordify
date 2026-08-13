@@ -74,8 +74,8 @@ internal static class LocalizationLoader
     private static readonly Lazy<ReadOnlyCollection<string>> SupportedCultureNames = new(() =>
         new ReadOnlyCollection<string>(
             ResourceNames.Value
+                .Where(name => !Load(name).Deprecated)
                 .Select(CultureNameOf)
-                .Where(culture => !Load(culture).Deprecated)
                 .OrderBy(culture => culture, StringComparer.Ordinal)
                 .ToArray()));
 
@@ -144,8 +144,12 @@ internal static class LocalizationLoader
             regionMatches);
     }
 
-    private static LocalizationModel Load(string culture) =>
-        Cache.GetOrAdd(culture + ResourceSuffix, Parse);
+    // Takes the manifest name rather than a culture name. Rebuilding it as
+    // culture + ".json" worked only because every shipped file happens to be lowercase:
+    // the manifest lookup is case-sensitive, so one mis-cased file would have keyed this
+    // cache differently from Resolve and IsSupported, and thrown for every caller.
+    private static LocalizationModel Load(string resourceName) =>
+        Cache.GetOrAdd(resourceName, Parse);
 
     private static string CultureNameOf(string resourceName) =>
         resourceName.Substring(0, resourceName.Length - ResourceSuffix.Length);
@@ -189,7 +193,7 @@ internal static class LocalizationLoader
             if (!string.Equals(LanguageOf(candidate), requestedLanguage, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            if (Load(candidate).Deprecated)
+            if (Load(name).Deprecated)
                 continue;
 
             if (requestedRegion is not null &&

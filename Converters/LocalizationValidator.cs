@@ -63,6 +63,7 @@ internal static class LocalizationValidator
                 $"but is {settings.DecimalPlaces.ToString(CultureInfo.InvariantCulture)}.");
         }
 
+        ValidateDecimalPlacesFitScales(numbers, settings, source);
         ValidateSpecialNumbers(localization, settings, source);
         ValidateCurrencies(localization, source);
     }
@@ -89,12 +90,59 @@ internal static class LocalizationValidator
 
         ValidateParallelToScales(numbers.ScalesPlural, "numbers.scalesPlural", numbers.Scales.Length, source);
 
-        if (numbers.ScaleKinds is not null && numbers.ScaleKinds.Length != numbers.Scales.Length)
+        if (numbers.ScaleKinds is not { } kinds)
+            return;
+
+        if (kinds.Length != numbers.Scales.Length)
         {
             throw Invalid(source,
                 $"'numbers.scaleKinds' must have the same length as 'numbers.scales' " +
-                $"({numbers.Scales.Length}), but has {numbers.ScaleKinds.Length}.");
+                $"({numbers.Scales.Length}), but has {kinds.Length}.");
         }
+
+        // A JSON resource cannot carry an undefined kind — the string enum converter
+        // rejects an unknown name — but a model built in code can, because an enum in C#
+        // is only an int. The conversion loop reads a kind as "noun or not", so an
+        // undefined value silently behaves as an adjective and the locale gets grammar
+        // nobody asked for. A new ScaleKind has to be listed here as well as handled in
+        // the conversion loop; failing to do either should be loud, not silent.
+        for (var i = 0; i < kinds.Length; i++)
+        {
+            if (kinds[i] is not (ScaleKind.Adjective or ScaleKind.Noun))
+            {
+                throw Invalid(source,
+                    $"'numbers.scaleKinds[{i}]' is {((int)kinds[i]).ToString(CultureInfo.InvariantCulture)}, " +
+                    "which is not a scale kind. Use Adjective or Noun.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// The fractional part is read as a number in its own right, through the same routine
+    /// as the whole part, so a locale that cannot count past 999 cannot read a four-digit
+    /// fraction either.
+    /// </summary>
+    /// <remarks>
+    /// Left to fail at conversion time this surfaced as <c>NumberOutOfRangeException</c>
+    /// naming the whole number — "the number 1.123456 is too large for this locale" when
+    /// the whole part is 1. The mistake is in the model, so it is reported against the
+    /// model.
+    /// </remarks>
+    private static void ValidateDecimalPlacesFitScales(NumbersModel numbers, SettingsModel settings, string source)
+    {
+        // Groups of three digits, so three decimal places fit in the units group, four
+        // through six need the thousands word as well.
+        var required = Math.Max(1, (settings.DecimalPlaces + 2) / 3);
+
+        if (numbers.Scales.Length >= required)
+            return;
+
+        throw Invalid(source,
+            $"'settings.decimalPlaces' is {settings.DecimalPlaces.ToString(CultureInfo.InvariantCulture)}, so a " +
+            $"fraction of up to that many digits has to be read as a number, which needs " +
+            $"{required.ToString(CultureInfo.InvariantCulture)} scale word(s) — but 'numbers.scales' defines " +
+            $"{numbers.Scales.Length.ToString(CultureInfo.InvariantCulture)}. Add scale words, or lower " +
+            "'settings.decimalPlaces'.");
     }
 
     private static void ValidateParallelToScales(string[]? values, string path, int expectedLength, string source)

@@ -3,6 +3,45 @@
 All notable changes to this project are documented in this file.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-08-13
+
+Three validation gaps, each of which let a custom localization construct successfully and
+then misbehave later. Nothing changes for the bundled locales, and conversion output is
+unchanged. This is a minor rather than a patch because two of the rules reject models that
+2.0.x accepted.
+
+### Added
+
+- **`settings.decimalPlaces` is now checked against `numbers.scales`.** The fraction is
+  read as a number in its own right, through the same routine as the whole part, so it
+  needs one scale word per three decimal places. A locale with `decimalPlaces: 6` and a
+  single scale entry used to construct fine and then fail on `1.123456` with
+  `NumberOutOfRangeException: The number 1.123456 is too large for this locale` — blaming
+  a whole part of 1. The mistake is in the model, so it is now reported against the model.
+- **`numbers.scaleKinds` entries are now checked against the enum.** A JSON resource could
+  never carry an undefined kind, because the string converter rejects an unknown name, but
+  a model built in C# could: an enum is only an int. The conversion loop asks "noun or
+  not", so `(ScaleKind)7` silently read as an adjective and produced grammar the locale
+  never asked for. This was found while reviewing a proposed refactor whose correctness
+  depended on it — see below.
+
+### Changed
+
+- `LocalizationLoader.Load` takes the embedded resource name rather than rebuilding it
+  from a culture name. Both call sites already held the real name, and reconstructing it
+  as `culture + ".json"` worked only because every shipped resource happens to be
+  lowercase — the manifest lookup is case-sensitive, so a single mis-cased file would have
+  keyed the cache differently from the two paths that read it and thrown for every caller.
+  No behaviour change on the shipped set.
+
+### Not in this release
+
+- Collapsing the converter's three "what follows this group" derivations into one enum.
+  The `scaleKinds` rule above was its blocker: with an undefined kind the refactor changed
+  the words produced. That is now unrepresentable, so the refactor is unblocked — but it
+  is a change to the conversion core with no user-visible benefit, and it should not ride
+  along in the same diff as new validation rules.
+
 ## [2.0.1] - 2026-08-13
 
 Two defects a consumer of 2.0.0 can reach through the public API. Conversion output is
