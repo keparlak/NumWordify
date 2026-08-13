@@ -113,7 +113,7 @@ public class LocalizationValidationTests
     public void Every_library_exception_shares_one_base_type()
     {
         Assert.IsAssignableFrom<NumWordifyException>(
-            Assert.Throws<LocalizationNotFoundException>(() => 1m.ToWords("de-DE")));
+            Assert.Throws<LocalizationNotFoundException>(() => 1m.ToWords("ja-JP")));
 
         Assert.IsAssignableFrom<NumWordifyException>(
             Assert.Throws<InvalidLocalizationException>(() => 1m.ToWords(new LocalizationModel())));

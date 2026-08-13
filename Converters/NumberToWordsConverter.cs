@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using NumWordify.Exceptions;
 using NumWordify.Models;
@@ -439,7 +440,7 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
             return (string.Empty, false);
 
         var scales = _localization.Numbers!.Scales;
-        var groups = new List<string>();
+        var groups = new List<(string Text, int Scale)>();
         var remaining = value;
         var scale = 0;
         var isLowestGroup = true;
@@ -465,11 +466,11 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
                 if (scale > 0)
                 {
                     var scaleWord = ScaleWord(scale, group);
-                    text = text.Length == 0 ? scaleWord : text + " " + scaleWord;
+                    text = text.Length == 0 ? scaleWord : text + Glue(following) + scaleWord;
                 }
 
                 if (text.Length > 0)
-                    groups.Insert(0, text);
+                    groups.Insert(0, (text, scale));
 
                 if (isLowestGroup)
                 {
@@ -494,20 +495,41 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
     /// <see cref="SettingsModel.FinalGroupSeparator"/> when the last group is a single
     /// term — below one hundred, or a whole number of hundreds.
     /// </summary>
-    private string JoinGroups(List<string> groups, int lowestGroup)
+    private string JoinGroups(List<(string Text, int Scale)> groups, int lowestGroup)
     {
-        var separator = _localization.Settings.FinalGroupSeparator;
+        if (groups.Count == 0)
+            return string.Empty;
+
+        var finalSeparator = _localization.Settings.FinalGroupSeparator;
 
         // A group of 234 is three terms, so Portuguese reads MIL DUZENTOS E TRINTA E
         // QUATRO with no conjunction after MIL; 800 and 22 are one term each, so they get
         // MIL E OITOCENTOS and MIL E VINTE E DOIS.
         var lastIsSingleTerm = lowestGroup < 100 || lowestGroup % 100 == 0;
 
-        if (string.IsNullOrEmpty(separator) || groups.Count < 2 || !lastIsSingleTerm)
-            return string.Join(" ", groups);
+        var builder = new StringBuilder(groups[0].Text);
 
-        return string.Join(" ", groups.Take(groups.Count - 1)) + separator + groups[groups.Count - 1];
+        for (var index = 1; index < groups.Count; index++)
+        {
+            // How tightly two groups bind is decided by the scale word of the one above:
+            // a noun takes a space, a numeral adjective may run straight on.
+            var glue = Glue(Following.Scale(KindOf(groups[index - 1].Scale), Gender.Masculine));
+
+            if (index == groups.Count - 1 && lastIsSingleTerm && !string.IsNullOrEmpty(finalSeparator))
+                glue = finalSeparator!;
+
+            builder.Append(glue).Append(groups[index].Text);
+        }
+
+        return builder.ToString();
     }
+
+    /// <summary>
+    /// What separates a scale word from the digits around it. Only an adjective is
+    /// configurable: a noun scale word is a noun and always stands on its own.
+    /// </summary>
+    private string Glue(Following following) =>
+        following.IsNoun ? " " : _localization.Settings.AdjectiveScaleSeparator;
 
     private string ScaleWord(int scale, int group)
     {
@@ -700,11 +722,16 @@ public sealed class NumberToWordsConverter : INumberToWordsConverter
         if (tens == 0)
             return numbers.Ones[ones];
 
-        var word = numbers.Tens[tens];
-        if (ones > 0)
-            word += (_localization.SpecialNumbers?.CompoundSeparator ?? " ") + numbers.Ones[ones];
+        if (ones == 0)
+            return numbers.Tens[tens];
 
-        return word;
+        var separator = _localization.SpecialNumbers?.CompoundSeparator ?? " ";
+
+        // German counts through the last two digits backwards: EINUNDZWANZIG, "one and
+        // twenty". Only the order differs; the separator is the same one.
+        return _localization.Settings.OnesBeforeTens
+            ? numbers.Ones[ones] + separator + numbers.Tens[tens]
+            : numbers.Tens[tens] + separator + numbers.Ones[ones];
     }
 
     private string ReadFractionDigits(decimal fraction, int decimalPlaces)

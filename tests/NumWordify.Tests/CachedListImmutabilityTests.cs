@@ -30,13 +30,13 @@ public class CachedListImmutabilityTests
         var cultures = NumberToWordsConverter.SupportedCultures;
 
         Assert.Throws<NotSupportedException>(() => ((IList<string>)cultures)[0] = "PWNED");
-        Assert.Equal(["en-US", "es-ES", "fr-FR", "pt-PT", "ru-RU", "tr-TR"], NumberToWordsConverter.SupportedCultures);
+        Assert.Equal(["de-DE", "en-US", "es-ES", "fr-FR", "pt-PT", "ru-RU", "tr-TR"], NumberToWordsConverter.SupportedCultures);
     }
 
     [Fact]
     public void The_cultures_carried_by_the_not_found_exception_cannot_be_cast_back_to_an_array()
     {
-        var exception = Assert.Throws<LocalizationNotFoundException>(() => 1m.ToWords("de-DE"));
+        var exception = Assert.Throws<LocalizationNotFoundException>(() => 1m.ToWords("ja-JP"));
 
         Assert.IsNotType<string[]>(exception.AvailableCultures);
         Assert.Throws<InvalidCastException>(() => (string[])exception.AvailableCultures);

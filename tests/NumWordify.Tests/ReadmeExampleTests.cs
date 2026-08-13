@@ -68,7 +68,7 @@ public class ReadmeExampleTests
     public void Supported_cultures_listing()
     {
         Assert.Equal(
-            ["en-US", "es-ES", "fr-FR", "pt-PT", "ru-RU", "tr-TR"],
+            ["de-DE", "en-US", "es-ES", "fr-FR", "pt-PT", "ru-RU", "tr-TR"],
             NumberToWordsConverter.SupportedCultures);
     }
 
@@ -93,7 +93,7 @@ public class ReadmeExampleTests
     [InlineData("en-GB", true, false)]
     [InlineData("es-MX", true, false)]
     [InlineData("es", true, true)]
-    [InlineData("de-DE", false, false)]
+    [InlineData("ja-JP", false, false)]
     public void Culture_guard_example(string machineCulture, bool supported, bool currencyApplies)
     {
         // Parameterised over the machine culture on purpose. The previous version of this

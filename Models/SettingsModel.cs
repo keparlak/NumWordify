@@ -127,6 +127,33 @@ public class SettingsModel
     public string? FinalGroupSeparator { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the ones word comes before the tens word
+    /// inside a group. Defaults to <see langword="false"/>.
+    /// </summary>
+    /// <remarks>
+    /// German counts backwards through the last two digits: 21 is <c>EINUNDZWANZIG</c>,
+    /// literally "one and twenty". The separator is still
+    /// <see cref="SpecialNumbersModel.CompoundSeparator"/>; only the order changes.
+    /// </remarks>
+    [JsonPropertyName("onesBeforeTens")]
+    public bool OnesBeforeTens { get; set; }
+
+    /// <summary>
+    /// Gets or sets what goes on either side of a scale word of kind
+    /// <see cref="ScaleKind.Adjective"/> — between it and the digits in front of it, and
+    /// between it and whatever follows. Defaults to a single space.
+    /// </summary>
+    /// <remarks>
+    /// German writes everything below a million as one word and everything above it
+    /// separately, and those are the same two classes this library already calls
+    /// adjective and noun: <c>EINHUNDERTZWANZIGTAUSENDVIERHUNDERTNEUNZEHN</c>, but
+    /// <c>ZWEI MILLIONEN</c> with a space. A noun scale word always takes a space, so
+    /// there is no setting for it.
+    /// </remarks>
+    [JsonPropertyName("adjectiveScaleSeparator")]
+    public string AdjectiveScaleSeparator { get; set; } = " ";
+
+    /// <summary>
     /// Gets or sets the word placed in front of negative numbers.
     /// </summary>
     [JsonPropertyName("negativeWord")]

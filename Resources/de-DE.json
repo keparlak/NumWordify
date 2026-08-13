@@ -1,0 +1,103 @@
+{
+  "defaultCurrency": "EUR",
+  "currencies": {
+    "EUR": {
+      "major": "EURO",
+      "minor": "CENT"
+    },
+    "CHF": {
+      "major": "FRANKEN",
+      "minor": "RAPPEN"
+    },
+    "USD": {
+      "major": "US-DOLLAR",
+      "minor": "CENT"
+    }
+  },
+  "settings": {
+    "onesBeforeTens": true,
+    "adjectiveScaleSeparator": "",
+    "hundredsSeparator": "",
+    "apocopateBeforeNoun": true,
+    "negativeWord": "MINUS",
+    "zeroWord": "NULL",
+    "currencyFormat": "{whole} {major} {decimal} {minor}",
+    "numberFormat": "{whole} KOMMA {decimal}",
+    "decimalPlaces": 2,
+    "useTeens": true
+  },
+  "numbers": {
+    "ones": [
+      "",
+      "EINS",
+      "ZWEI",
+      "DREI",
+      "VIER",
+      "FÜNF",
+      "SECHS",
+      "SIEBEN",
+      "ACHT",
+      "NEUN"
+    ],
+    "tens": [
+      "",
+      "ZEHN",
+      "ZWANZIG",
+      "DREISSIG",
+      "VIERZIG",
+      "FÜNFZIG",
+      "SECHZIG",
+      "SIEBZIG",
+      "ACHTZIG",
+      "NEUNZIG"
+    ],
+    "hundreds": [
+      "",
+      "EINHUNDERT",
+      "ZWEIHUNDERT",
+      "DREIHUNDERT",
+      "VIERHUNDERT",
+      "FÜNFHUNDERT",
+      "SECHSHUNDERT",
+      "SIEBENHUNDERT",
+      "ACHTHUNDERT",
+      "NEUNHUNDERT"
+    ],
+    "scales": ["", "TAUSEND", "MILLION", "MILLIARDE", "BILLION", "BILLIARDE"],
+    "scalesPlural": ["", "", "MILLIONEN", "MILLIARDEN", "BILLIONEN", "BILLIARDEN"],
+    "scaleKinds": ["Adjective", "Adjective", "Noun", "Noun", "Noun", "Noun"],
+    "scaleGenders": ["Masculine", "Masculine", "Feminine", "Feminine", "Feminine", "Feminine"]
+  },
+  "specialNumbers": {
+    "teens": [
+      "ELF",
+      "ZWÖLF",
+      "DREIZEHN",
+      "VIERZEHN",
+      "FÜNFZEHN",
+      "SECHZEHN",
+      "SIEBZEHN",
+      "ACHTZEHN",
+      "NEUNZEHN"
+    ],
+    "compoundSeparator": "UND",
+    "special": {
+      "21": "EINUNDZWANZIG",
+      "31": "EINUNDDREISSIG",
+      "41": "EINUNDVIERZIG",
+      "51": "EINUNDFÜNFZIG",
+      "61": "EINUNDSECHZIG",
+      "71": "EINUNDSIEBZIG",
+      "81": "EINUNDACHTZIG",
+      "91": "EINUNDNEUNZIG"
+    },
+    "specialBeforeScale": {
+      "1": "EIN"
+    },
+    "byGender": {
+      "Feminine": {
+        "1": "EINE"
+      }
+    }
+  }
+}
