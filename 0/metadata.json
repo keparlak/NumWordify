@@ -1,0 +1,62 @@
+{
+  "cli_version": "0.9.0",
+  "checkpoint_id": "01KZXPDDY1Q0GK62J7YH9P75BC",
+  "session_id": "806ff40c-d20c-4f2d-940c-ba9eede27e70",
+  "strategy": "manual-commit",
+  "created_at": "2026-08-13T13:54:05.6251426Z",
+  "branch": "feat/2.1.0-validation-hardening",
+  "checkpoints_count": 2,
+  "save_step_count": 2,
+  "files_touched": [
+    "CHANGELOG.md",
+    "Converters/LocalizationLoader.cs",
+    "Converters/LocalizationValidator.cs",
+    "NumWordify.csproj",
+    "README.md"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5[1m]",
+  "turn_id": "07797e585471",
+  "compact_transcript_start": 0,
+  "token_usage": {
+    "input_tokens": 442,
+    "cache_creation_tokens": 1709410,
+    "cache_read_tokens": 69215184,
+    "output_tokens": 189605,
+    "api_call_count": 236
+  },
+  "session_metrics": {
+    "turn_count": 13
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-08-13T13:54:05.4637446Z",
+    "agent_lines": 0,
+    "agent_removed": 9,
+    "human_added": 160,
+    "human_modified": 1360,
+    "human_removed": 0,
+    "total_committed": 1520,
+    "total_lines_changed": 1529,
+    "agent_percentage": 0.5886200130804448,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 5,
+      "user_lines_removed": 0,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        ".claude/settings.local.json": 5
+      }
+    }
+  ]
+}
