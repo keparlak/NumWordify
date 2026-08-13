@@ -30,7 +30,7 @@ public class CachedListImmutabilityTests
         var cultures = NumberToWordsConverter.SupportedCultures;
 
         Assert.Throws<NotSupportedException>(() => ((IList<string>)cultures)[0] = "PWNED");
-        Assert.Equal(["en-US", "es-ES", "fr-FR", "tr-TR"], NumberToWordsConverter.SupportedCultures);
+        Assert.Equal(["en-US", "es-ES", "fr-FR", "pt-PT", "tr-TR"], NumberToWordsConverter.SupportedCultures);
     }
 
     [Fact]

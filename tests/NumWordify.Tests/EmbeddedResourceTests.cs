@@ -1,4 +1,5 @@
 using NumWordify.Converters;
+using NumWordify.Exceptions;
 using Xunit;
 
 namespace NumWordify.Tests;
@@ -50,15 +51,26 @@ public class EmbeddedResourceTests
             Assert.False(string.IsNullOrWhiteSpace(converter.Convert(value)));
         }
 
-        // Capped at 10^15 − 1, the lowest ceiling among the shipped locales: Spanish
-        // defines five scale words because there is no single word for 10^15.
-        foreach (var value in new[]
-                 {
-                     1_001m, 12_345m, 999_999m, 1_000_000m, 123_456_789m,
-                     1_000_000_000m, 987_654_321_012_345m,
-                 })
+        // Every shipped locale has to reach at least 10^9 − 1. That is the floor, and it
+        // is asserted rather than assumed, so a locale that silently lost scale words
+        // fails here instead of somewhere downstream.
+        foreach (var value in new[] { 1_001m, 12_345m, 999_999m, 1_000_000m, 123_456_789m, 999_999_999m })
         {
             Assert.False(string.IsNullOrWhiteSpace(converter.Convert(value)));
+        }
+
+        // Above that the locales diverge and there is no shared cap: pt-PT stops right
+        // there, because a thousand million is two words in European Portuguese and the
+        // scale table holds one word per step; es-ES stops at 10^15 − 1. A locale may
+        // refuse these, but only by saying so.
+        foreach (var value in new[] { 1_000_000_000m, 987_654_321_012_345m })
+        {
+            var exception = Record.Exception(() => converter.Convert(value));
+
+            if (exception is null)
+                Assert.False(string.IsNullOrWhiteSpace(converter.Convert(value)));
+            else
+                Assert.IsType<NumberOutOfRangeException>(exception);
         }
     }
 

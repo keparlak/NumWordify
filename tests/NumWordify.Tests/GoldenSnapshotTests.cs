@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Text;
 using NumWordify.Converters;
+using NumWordify.Exceptions;
 using Xunit;
 
 namespace NumWordify.Tests;
@@ -33,8 +34,9 @@ public class GoldenSnapshotTests
 
     /// <summary>
     /// Magnitudes chosen to exercise scale boundaries, carries, and the interaction
-    /// between a hundreds digit and the scale word that follows it. Capped at 10^15 − 1,
-    /// the lowest ceiling among the shipped locales.
+    /// between a hundreds digit and the scale word that follows it. The ladder runs to
+    /// 10^15 − 1, past the ceiling of some locales on purpose: a value a locale cannot
+    /// express is recorded as such in its snapshot rather than dropped from the ladder.
     /// </summary>
     private static readonly decimal[] Magnitudes =
     [
@@ -112,10 +114,30 @@ public class GoldenSnapshotTests
         builder
             .Append(value.ToString(CultureInfo.InvariantCulture))
             .Append(" | ")
-            .Append(converter.Convert(value))
+            .Append(Render(converter.Convert, value))
             .Append(" | ")
-            .Append(converter.ConvertWithoutCurrency(value))
+            .Append(Render(converter.ConvertWithoutCurrency, value))
             .Append('\n');
+    }
+
+    /// <summary>
+    /// Records a locale's ceiling in the snapshot rather than capping the ladder at the
+    /// lowest one. Locales do not share a range — pt-PT stops at 10^9 − 1 because it has
+    /// no single word for a thousand million, es-ES at 10^15 − 1 — and capping everyone at
+    /// the smallest would drop coverage from the four locales that reach further. Writing
+    /// the refusal into the file makes a changed ceiling show up as a reviewable diff,
+    /// which is the same reason the rest of this file exists.
+    /// </summary>
+    private static string Render(Func<decimal, string> convert, decimal value)
+    {
+        try
+        {
+            return convert(value);
+        }
+        catch (NumberOutOfRangeException)
+        {
+            return "<out of range>";
+        }
     }
 
     private static void AssertSameLines(string expected, string actual, string culture)

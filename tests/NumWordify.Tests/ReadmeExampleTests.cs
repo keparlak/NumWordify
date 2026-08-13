@@ -68,7 +68,7 @@ public class ReadmeExampleTests
     public void Supported_cultures_listing()
     {
         Assert.Equal(
-            ["en-US", "es-ES", "fr-FR", "tr-TR"],
+            ["en-US", "es-ES", "fr-FR", "pt-PT", "tr-TR"],
             NumberToWordsConverter.SupportedCultures);
     }
 

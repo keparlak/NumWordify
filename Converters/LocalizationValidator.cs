@@ -56,6 +56,11 @@ internal static class LocalizationValidator
         RequireText(settings.ZeroWord, "settings.zeroWord", source);
         RequireText(settings.NegativeWord, "settings.negativeWord", source);
 
+        // Null would reach string.Join and throw there instead of here. Empty is legal —
+        // it means the two words run together, which some locales want.
+        if (settings.HundredsSeparator is null)
+            throw Invalid(source, "'settings.hundredsSeparator' is null. Use an empty string instead.");
+
         if (settings.DecimalPlaces is < 0 or > MaxDecimalPlaces)
         {
             throw Invalid(source,
